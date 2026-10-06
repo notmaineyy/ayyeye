@@ -133,7 +133,7 @@ MIDDLE_MAN_EMAIL = "acres-coordinator@example.sg"
 # ---------------------------------------------------------------------------
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
+GEMINI_DEFAULT_MODEL = "gemini-3.8-flash"
 
 
 def get_secret(name: str) -> str:
