@@ -17,6 +17,8 @@ help raise ACRES security clearance requests. No cloud AI services are used.
   model.
 - Expands a short description of work into a professional sentence.
 - Produces a copy-ready row and saves it as `<Name>_ACRES_ready.csv`.
+- Final step packages the details and routes them to the project executive
+  (pre-filled from the project's department), removing the middleman.
 - Shows who to send the completed form to for feedback.
 
 ## Prerequisites

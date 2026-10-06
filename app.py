@@ -21,6 +21,7 @@ import io
 import json
 import os
 import re
+import urllib.parse
 import uuid
 from pathlib import Path
 
@@ -116,9 +117,9 @@ ACRES_COLUMNS = [
 #: Default company name and address / UEN.
 COMPANY_NAME = "DSTA (1 Depot Road S109679)"
 
-#: Who completed forms should be sent to for now (the current middle man).
-MIDDLE_MAN_NAME = "the ACRES clearance coordinator (current middle man)"
-MIDDLE_MAN_EMAIL = "acres-coordinator@example.sg"
+#: Dummy project-executive email used to pre-fill the routing field. The real
+#: recipient is derived from the project's department (see projects.csv).
+PROJECT_EXECUTIVE_EMAIL = "abc@dsta.gov.sg"
 
 
 # ---------------------------------------------------------------------------
@@ -931,6 +932,29 @@ def build_acres_row(data: dict) -> pd.DataFrame:
     return pd.DataFrame([row], columns=ACRES_COLUMNS)
 
 
+def build_email_body(result: pd.DataFrame, project: pd.Series | None) -> str:
+    """Package the clearance row (plus routing info) as plain email text."""
+    lines = ["ACRES Clearance Request", ""]
+    for column in result.columns:
+        value = result.iloc[0][column]
+        if value is None or str(value).strip() == "":
+            continue
+        lines.append(f"{column}: {value}")
+    if project is not None:
+        lines.append(f"DEPARTMENT: {project.get('Department', '')}")
+        lines.append(f"PROJECT EXECUTIVE: {project.get('Project Executive', '')}")
+    return "\n".join(lines)
+
+
+def mailto_link(recipient: str, subject: str, body: str) -> str:
+    """Build a mailto: link that opens the user's email client pre-filled."""
+    return (
+        f"mailto:{urllib.parse.quote(recipient)}"
+        f"?subject={urllib.parse.quote(subject)}"
+        f"&body={urllib.parse.quote(body)}"
+    )
+
+
 def normalize_gender(value: str) -> str:
     """Map loose gender values onto the selectable options."""
     text = value.strip().lower()
@@ -1493,37 +1517,89 @@ def main() -> None:
     result = build_acres_row(data)
 
     st.subheader("ACRES Clearance Row")
-    st.caption("Review the generated row below before submitting.")
+    st.caption("Review the generated row below before sending.")
     st.dataframe(result, width="stretch")
 
-    if st.button("Submit to Security", type="primary"):
-        filename = f"{safe_filename(name)}_ACRES_ready.csv"
-        out_path = Path(__file__).with_name(filename)
-        result.to_csv(out_path, index=False)
-        st.markdown(
-            f'<div class="acres-success">Submitted successfully. Your clearance '
-            f"request has been routed to the processing team and saved locally "
-            f"as <strong>{filename}</strong>.</div>",
-            unsafe_allow_html=True,
-        )
-
-    # -- Next steps / recipient ---------------------------------------------
-    recipient = (
-        project["Ops Manager Endorsement"] if project is not None else MIDDLE_MAN_NAME
+    # -- Final step: route for clearance ------------------------------------
+    st.subheader("Final Step — Route for Clearance")
+    st.caption(
+        "This tool sends your details straight to the project executive, "
+        "removing the middleman between you and them."
     )
+
+    # Pre-fill the recipient from the project executive; refresh if the project
+    # changes so the default follows the project's department.
+    if project is not None and (
+        st.session_state.get("_recipient_for_project") != project["Project Name"]
+    ):
+        st.session_state["in_recipient_email"] = PROJECT_EXECUTIVE_EMAIL
+        st.session_state["_recipient_for_project"] = project["Project Name"]
+
+    recipient_email = st.text_input(
+        "Send to (email):",
+        key="in_recipient_email",
+        placeholder=PROJECT_EXECUTIVE_EMAIL,
+        help=(
+            "Pre-filled with the project executive. Change it if your project "
+            "requires sending to someone else first."
+        ),
+    ).strip()
+
+    st.text_input(
+        "PROJECT EXECUTIVE (auto-filled):",
+        value=project.get("Project Executive", "") if project is not None else "",
+        disabled=True,
+    )
+    st.text_input(
+        "DEPARTMENT (auto-filled):",
+        value=project.get("Department", "") if project is not None else "",
+        disabled=True,
+    )
+    st.caption(
+        "Note: some projects require the details to be sent to other people "
+        "(e.g. your Ops Manager) before the project executive. If so, enter "
+        "their email above instead."
+    )
+
+    if st.button("Package & Send for Clearance", type="primary"):
+        if not recipient_email or "@" not in recipient_email:
+            st.error("Please enter a valid recipient email before sending.")
+        else:
+            filename = f"{safe_filename(name)}_ACRES_ready.csv"
+            out_path = Path(__file__).with_name(filename)
+            result.to_csv(out_path, index=False)
+            body = build_email_body(result, project)
+            link = mailto_link(
+                recipient_email, f"ACRES Clearance Request — {name}", body
+            )
+            st.markdown(
+                f'<div class="acres-success">Packaged and routed to '
+                f"<strong>{recipient_email}</strong>. Saved locally as "
+                f"<strong>{filename}</strong>.</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(f"[Open this request in your email client]({link})")
+            with st.expander("Preview the packaged details", expanded=False):
+                st.text(body)
+
+    # -- What happens next --------------------------------------------------
+    executive = project.get("Project Executive", "") if project is not None else ""
+    department = project.get("Department", "") if project is not None else ""
     st.markdown(
         f"""
         <div class="acres-footer">
             <h4>What happens next?</h4>
-            <p>Send your completed ACRES row to the current clearance
-            coordinator (the middle man) and ask for their feedback:</p>
+            <p>Your packaged details are routed to the project executive for
+            your project's department, who submits them for clearance. This
+            removes the middleman between you and the project executive.</p>
             <ul>
-                <li><strong>{recipient}</strong></li>
-                <li>Coordinator contact: {MIDDLE_MAN_EMAIL}</li>
+                <li>Project executive: <strong>{executive}</strong>
+                ({PROJECT_EXECUTIVE_EMAIL})</li>
+                <li>Department: <strong>{department}</strong></li>
             </ul>
-            <p>We are still learning the process for each project, so please
-            forward it to whoever is coordinating clearance for your project
-            and share their feedback with us.</p>
+            <p>Some projects require sending these details to other people
+            first. If that applies, change the recipient above. We're still
+            learning each project's process, so please share any feedback.</p>
         </div>
         """,
         unsafe_allow_html=True,
