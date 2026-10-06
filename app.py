@@ -126,14 +126,18 @@ MIDDLE_MAN_EMAIL = "acres-coordinator@example.sg"
 #
 # Locally the app uses Ollama. In the cloud (e.g. Streamlit Community Cloud)
 # there is no Ollama, so if an API key is configured the app uses a cloud model
-# instead. Supported (via Streamlit secrets or environment variables):
-#   * Gemini (free tier)   - GEMINI_API_KEY (or GOOGLE_API_KEY)
+# instead. Precedence (first key found wins):
+#   * OpenCode Go          - OPENCODE_API_KEY            (OpenAI-compatible)
+#   * Gemini (free tier)   - GEMINI_API_KEY / GOOGLE_API_KEY
 #   * OpenAI-compatible    - OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 #                            (also works for Groq / OpenRouter / Together)
 # ---------------------------------------------------------------------------
 
+OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
+OPENCODE_GO_DEFAULT_MODEL = "deepseek-v4-flash"
+
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-GEMINI_DEFAULT_MODEL = "gemini-3.8-flash"
+GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
 
 
 def get_secret(name: str) -> str:
@@ -149,9 +153,21 @@ def get_secret(name: str) -> str:
 def cloud_model_config() -> dict | None:
     """Return cloud model settings when an API key is configured.
 
-    Gemini takes precedence when its key is present; otherwise any
-    OpenAI-compatible key is used.
+    OpenCode Go takes precedence, then Gemini, then any OpenAI-compatible key.
     """
+    opencode_key = (
+        get_secret("OPENCODE_API_KEY").strip()
+        or get_secret("OPENCODE_GO_API_KEY").strip()
+    )
+    if opencode_key:
+        return {
+            "provider": "OpenCode Go",
+            "api_key": opencode_key,
+            "base_url": get_secret("OPENCODE_BASE_URL").strip() or OPENCODE_GO_BASE_URL,
+            "model": get_secret("OPENCODE_MODEL").strip()
+            or OPENCODE_GO_DEFAULT_MODEL,
+        }
+
     gemini_key = (
         get_secret("GEMINI_API_KEY").strip() or get_secret("GOOGLE_API_KEY").strip()
     )
