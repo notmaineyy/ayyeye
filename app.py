@@ -117,6 +117,10 @@ ACRES_COLUMNS = [
 #: Default company name and address / UEN.
 COMPANY_NAME = "DSTA (1 Depot Road S109679)"
 
+#: Build/version stamp shown in the UI (bump this on each deploy so it is easy
+#: to confirm which version is live).
+APP_VERSION = "2026-10-06.4"
+
 #: Dummy project-executive email used to pre-fill the routing field. The real
 #: recipient is derived from the project's department (see projects.csv).
 PROJECT_EXECUTIVE_EMAIL = "abc@dsta.gov.sg"
@@ -1054,11 +1058,12 @@ def read_uploaded_documents(uploaded) -> tuple[str, list[str]]:
 def render_header() -> None:
     """Render the branded page title."""
     st.markdown(
-        """
+        f"""
         <div class="acres-title">
             <h1>ACRES Clearance Automated Intake</h1>
             <div class="acres-subtitle">
                 Secure Access &amp; Clearance Request System &mdash; Intake Form
+                &middot; build {APP_VERSION}
             </div>
         </div>
         """,
@@ -1600,6 +1605,7 @@ def main() -> None:
             <p>Some projects require sending these details to other people
             first. If that applies, change the recipient above. We're still
             learning each project's process, so please share any feedback.</p>
+            <p style="color:#8A94A2;font-size:0.8rem">Build {APP_VERSION}</p>
         </div>
         """,
         unsafe_allow_html=True,
