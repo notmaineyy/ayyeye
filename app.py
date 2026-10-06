@@ -21,6 +21,7 @@ import io
 import json
 import os
 import re
+import uuid
 from pathlib import Path
 
 import ollama
@@ -200,6 +201,24 @@ def active_provider() -> str:
     return f"local Ollama ({OLLAMA_MODEL})"
 
 
+#: Stable session id used when no Streamlit session is available.
+_FALLBACK_SESSION_ID = f"acres-{uuid.uuid4().hex}"
+
+
+def opencode_session_id() -> str:
+    """Return a stable session id for OpenCode Go request routing.
+
+    OpenCode Go asks clients to send a stable ``x-opencode-session`` value so it
+    can optimize routing and prompt caching.
+    """
+    try:
+        if "opencode_session_id" not in st.session_state:
+            st.session_state["opencode_session_id"] = f"acres-{uuid.uuid4().hex}"
+        return st.session_state["opencode_session_id"]
+    except Exception:  # noqa: BLE001 - running outside a Streamlit session
+        return _FALLBACK_SESSION_ID
+
+
 def _extract_json(text: str) -> str:
     """Pull a JSON object out of a model reply (strips markdown fences)."""
     text = text.strip()
@@ -221,6 +240,12 @@ def chat(messages: list[dict], schema: dict | None = None) -> str:
     if config:
         client = openai.OpenAI(api_key=config["api_key"], base_url=config["base_url"])
         kwargs: dict = {"model": config["model"], "messages": messages}
+        if config["provider"] == "OpenCode Go":
+            # OpenCode Go requires a stable session id and a client user agent.
+            kwargs["extra_headers"] = {
+                "x-opencode-session": opencode_session_id(),
+                "User-Agent": "acres-clearance-intake/1.0",
+            }
         if schema is not None:
             messages = list(messages)
             messages[0] = {
