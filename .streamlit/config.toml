@@ -1,0 +1,19 @@
+[server]
+headless = true
+address = "0.0.0.0"
+port = 8501
+# Required so the app works behind a tunnel host (Cloudflare/ngrok).
+enableCORS = false
+enableXsrfProtection = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#F26522"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F8"
+textColor = "#1A1A1A"
+font = "sans serif"
+
