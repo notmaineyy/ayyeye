@@ -1353,7 +1353,7 @@ def main() -> None:
     msd_ref_number = st.text_input(
         "MSD REF NUMBER:",
         key="in_msd_ref_no",
-        placeholder="M/202510131554246",
+        placeholder="M/2025111111111111",
         help="MSD reference number in the M/... format.",
     ).strip()
     msd_ref_date = st.text_input(
