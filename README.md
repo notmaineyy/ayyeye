@@ -11,8 +11,10 @@ help raise ACRES security clearance requests. No cloud AI services are used.
   nature-of-involvement details).
 - Auto-fills project-derived fields (location, end date, ops manager,
   clearance level) from `projects.csv`.
-- Reads attached PDF/image documents and extracts religion, gender, mobile
-  number, appointment/designation and MSD numbers/dates using the local model.
+- Reads attached PDF/image documents and extracts clearance details
+  (clearance category, MSD reference number/date, start/end dates) plus
+  religion, gender, mobile number and appointment/designation using the local
+  model.
 - Expands a short description of work into a professional sentence.
 - Produces a copy-ready row and saves it as `<Name>_ACRES_ready.csv`.
 - Shows who to send the completed form to for feedback.

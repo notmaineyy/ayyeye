@@ -102,11 +102,10 @@ ACRES_COLUMNS = [
     "GENDER",
     "MOBILE NUMBER",
     "CLEARANCE LEVEL",
+    "CLEARANCE CATEGORY",
+    "MSD REF NUMBER",
+    "MSD REF DATE",
     "START DATE OF EMPLOYMENT",
-    "CAT 1 MSD NO",
-    "CAT 1 MSD DATE",
-    "PROJECT CLEARANCE MSD NO",
-    "PROJECT CLEARANCE MSD DATE",
     "HP AND EMAIL ADDRESS",
     "COMPANY APPT",
     "NATURE OF INVOLVEMENT",
@@ -511,13 +510,14 @@ class DocumentDetails(BaseModel):
     start_date_of_employment: str | None = Field(
         default=None, description="Start date of employment"
     )
-    cat1_msd_no: str | None = Field(default=None, description="CAT 1 MSD number")
-    cat1_msd_date: str | None = Field(default=None, description="CAT 1 MSD date")
-    project_clearance_msd_no: str | None = Field(
-        default=None, description="Project clearance MSD number"
+    clearance_category: str | None = Field(
+        default=None, description="Clearance category code, e.g. 1A, 01, 1, 02, 2B"
     )
-    project_clearance_msd_date: str | None = Field(
-        default=None, description="Project clearance MSD date"
+    msd_ref_number: str | None = Field(
+        default=None, description="MSD reference number in the form M/123456789"
+    )
+    msd_ref_date: str | None = Field(
+        default=None, description="MSD reference date"
     )
     clearance_start_date: str | None = Field(
         default=None, description="Start date of the clearance"
@@ -588,28 +588,22 @@ def extract_text_from_document(uploaded_file) -> str:
         return extract_text_from_image(uploaded_file)
 
 
-def _msd_bucket(category: str) -> str | None:
-    """Map a clearance category value to its MSD field prefix."""
-    upper = category.upper()
-    if "PROJECT" in upper or "PROJ" in upper:
-        return "project_clearance"
-    if "CAT" in upper:
-        return "cat1"
-    return None
-
-
 #: Column labels used in clearance tables/forms, matched against upper-cased text.
 _MSD_COLUMN_PATTERNS = [
     ("category", re.compile(r"CLEARANCE\s+CATEGORY")),
-    ("msd_no", re.compile(r"MSD\s+REF(?:ERENCE)?\s*(?:NUMBER|NO\.?)")),
-    ("msd_date", re.compile(r"MSD\s+REF(?:ERENCE)?\s*DATE")),
+    ("msd_ref", re.compile(r"MSD\s+REF(?:ERENCE)?\s*(?:NUMBER|NO\.?)")),
+    ("msd_ref_date", re.compile(r"MSD\s+REF(?:ERENCE)?\s*DATE")),
     ("start", re.compile(r"START\s+DATE")),
     ("end", re.compile(r"END\s+DATE")),
 ]
 
 
 def _parse_msd_table(lines: list[str]) -> dict[str, str]:
-    """Parse a clearance table whose columns are the known MSD labels."""
+    """Parse a clearance table.
+
+    Expected columns: Clearance Category | MSD Ref Number | MSD Ref Date |
+    Start Date | End Date.
+    """
     result: dict[str, str] = {}
 
     for header_index, header in enumerate(lines):
@@ -635,15 +629,14 @@ def _parse_msd_table(lines: list[str]) -> dict[str, str]:
                 continue
             values = dict(zip(column_keys, [cell.strip() for cell in cells]))
 
-            category = values.get("category", "")
-            prefix = _msd_bucket(category)
-            if not prefix:
-                continue
-            if values.get("msd_no"):
-                result[f"{prefix}_msd_no"] = values["msd_no"].strip(":;#-")
-            if values.get("msd_date"):
-                result[f"{prefix}_msd_date"] = (
-                    normalize_date(values["msd_date"]) or values["msd_date"]
+            if values.get("category"):
+                result.setdefault("clearance_category", values["category"].strip(":;#-,"))
+            if values.get("msd_ref"):
+                result.setdefault("msd_ref_number", values["msd_ref"].strip(":;#-,"))
+            if values.get("msd_ref_date"):
+                result.setdefault(
+                    "msd_ref_date",
+                    normalize_date(values["msd_ref_date"]) or values["msd_ref_date"],
                 )
             if values.get("start"):
                 result.setdefault(
@@ -696,26 +689,27 @@ def _segment_labels(text: str) -> list[str]:
 
 
 def _parse_msd_labels(lines: list[str]) -> dict[str, str]:
-    """Parse MSD / clearance fields from labelled lines."""
+    """Parse clearance fields from labelled lines."""
     result: dict[str, str] = {}
-    current_bucket: str | None = None
 
     for index, line in enumerate(lines):
         if not line:
             continue
         upper = line.upper()
 
-        if "CATEGORY" in upper:
-            value = _label_value(line, r"clearance\s+category")
-            current_bucket = _msd_bucket(value) or current_bucket
-
-        # Employment start date (must be checked before generic start date).
+        # Employment start date (checked before the clearance start date).
         if "EMPLOYMENT" in upper and "START DATE" in upper:
             value = _label_value(line, r"start\s+date\s+of\s+employment")
-            if value:
+            if value and not _LABEL_ONLY.match(value):
                 result.setdefault(
                     "start_date_of_employment", normalize_date(value) or value
                 )
+            continue
+
+        if "CATEGORY" in upper:
+            value = _label_value(line, r"clearance\s+category")
+            if value and not _LABEL_ONLY.match(value):
+                result.setdefault("clearance_category", value)
             continue
 
         is_msd_ref = "MSD" in upper and (
@@ -730,13 +724,10 @@ def _parse_msd_labels(lines: list[str]) -> dict[str, str]:
                     value = nxt
             if not value or _LABEL_ONLY.match(value):
                 continue
-            bucket = _msd_bucket(upper) or current_bucket
-            if not bucket:
-                bucket = "cat1" if "cat1_msd_no" not in result else "project_clearance"
             if is_msd_date:
-                result.setdefault(f"{bucket}_msd_date", normalize_date(value) or value)
+                result.setdefault("msd_ref_date", normalize_date(value) or value)
             else:
-                result.setdefault(f"{bucket}_msd_no", value)
+                result.setdefault("msd_ref_number", value)
             continue
 
         if "START DATE" in upper and "EMPLOYMENT" not in upper:
@@ -761,39 +752,35 @@ def _parse_msd_labels(lines: list[str]) -> dict[str, str]:
 _MSD_DATE_TOKEN = re.compile(
     r"\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}"
 )
-#: Reference-like tokens (letters + digits joined by - or /), e.g. MSD-2024-00123.
-_MSD_REF_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+)+")
+#: MSD reference numbers look like M/202510131554246.
+_MSD_M_REF = re.compile(r"\bM/[0-9A-Za-z]+\b", re.IGNORECASE)
 
 
 def _parse_msd_row(line: str) -> dict[str, str]:
-    """Parse a single table row even when OCR collapsed column spacing.
+    """Parse one clearance row, even when OCR collapsed the columns.
 
-    Identifies the clearance category, the MSD reference number and the first
-    date on the row (the MSD reference date).
+    A row is recognised by its ``M/...`` reference number. The clearance
+    category is the code immediately before it; dates are read in order:
+    MSD Ref Date, then Start Date, then End Date.
     """
-    upper = line.upper()
-    if "PROJECT" in upper:
-        prefix = "project_clearance"
-    elif re.search(r"\bCAT\s*\d", upper):
-        prefix = "cat1"
-    else:
+    ref_match = _MSD_M_REF.search(line)
+    if not ref_match:
         return {}
 
-    refs = [
-        match.group(0)
-        for match in _MSD_REF_TOKEN.finditer(line)
-        if any(ch.isdigit() for ch in match.group(0))
-    ]
-    dates = _MSD_DATE_TOKEN.findall(line)
+    result: dict[str, str] = {"msd_ref_number": ref_match.group(0)}
 
-    result: dict[str, str] = {}
-    if refs:
-        result[f"{prefix}_msd_no"] = refs[0].strip(":;#-")
+    # Category is the token just before the MSD ref (e.g. "1A M/...").
+    before = line[: ref_match.start()]
+    cat_match = re.search(r"(\d{1,2}[A-Za-z]?)\s*$", before)
+    if cat_match:
+        result["clearance_category"] = cat_match.group(1)
+
+    dates = _MSD_DATE_TOKEN.findall(line)
     if dates:
-        result[f"{prefix}_msd_date"] = normalize_date(dates[0]) or dates[0]
-    # Remaining dates on the row are the clearance start and end dates.
-    if len(dates) >= 3:
+        result["msd_ref_date"] = normalize_date(dates[0]) or dates[0]
+    if len(dates) >= 2:
         result.setdefault("clearance_start_date", normalize_date(dates[1]) or dates[1])
+    if len(dates) >= 3:
         result.setdefault("clearance_end_date", normalize_date(dates[2]) or dates[2])
     return result
 
@@ -931,11 +918,10 @@ def build_acres_row(data: dict) -> pd.DataFrame:
         "GENDER": data.get("gender", ""),
         "MOBILE NUMBER": data.get("mobile_number", ""),
         "CLEARANCE LEVEL": data["clearance_level"],
+        "CLEARANCE CATEGORY": data.get("clearance_category", ""),
+        "MSD REF NUMBER": data.get("msd_ref_number", ""),
+        "MSD REF DATE": data.get("msd_ref_date", ""),
         "START DATE OF EMPLOYMENT": data.get("start_date_of_employment", ""),
-        "CAT 1 MSD NO": data.get("cat1_msd_no", ""),
-        "CAT 1 MSD DATE": data.get("cat1_msd_date", ""),
-        "PROJECT CLEARANCE MSD NO": data.get("project_clearance_msd_no", ""),
-        "PROJECT CLEARANCE MSD DATE": data.get("project_clearance_msd_date", ""),
         "HP AND EMAIL ADDRESS": data.get("hp_email", ""),
         "COMPANY APPT": data["company_appt"],
         "NATURE OF INVOLVEMENT": data["nature_of_involvement"],
@@ -968,10 +954,9 @@ def apply_document_details(details: dict[str, str]) -> None:
         "mobile_number": "in_mobile",
         "appointment_designation": "in_company_appt",
         "start_date_of_employment": "in_start_employment",
-        "cat1_msd_no": "in_cat1_no",
-        "cat1_msd_date": "in_cat1_date",
-        "project_clearance_msd_no": "in_proj_msd_no",
-        "project_clearance_msd_date": "in_proj_msd_date",
+        "clearance_category": "in_clearance_category",
+        "msd_ref_number": "in_msd_ref_no",
+        "msd_ref_date": "in_msd_ref_date",
         "clearance_start_date": "in_start_date",
         "clearance_end_date": "in_end_date",
     }
@@ -1358,18 +1343,24 @@ def main() -> None:
             with st.expander("Fields the AI found", expanded=False):
                 st.json(_details)
 
-    st.markdown("**Clearance MSD Details**")
-    cat1_msd_no = st.text_input("CAT 1 MSD NO:", key="in_cat1_no").strip()
-    cat1_msd_date = st.text_input(
-        "CAT 1 MSD DATE (YYYY-MM-DD):", key="in_cat1_date", placeholder="2024-06-30"
+    st.markdown("**Clearance Details**")
+    clearance_category = st.text_input(
+        "CLEARANCE CATEGORY:",
+        key="in_clearance_category",
+        placeholder="e.g. 1A, 01, 1, 02, 2B",
+        help="Clearance category code as shown on the MSD document.",
     ).strip()
-    project_clearance_msd_no = st.text_input(
-        "PROJECT CLEARANCE MSD NO:", key="in_proj_msd_no"
+    msd_ref_number = st.text_input(
+        "MSD REF NUMBER:",
+        key="in_msd_ref_no",
+        placeholder="M/202510131554246",
+        help="MSD reference number in the M/... format.",
     ).strip()
-    project_clearance_msd_date = st.text_input(
-        "PROJECT CLEARANCE MSD DATE (YYYY-MM-DD):",
-        key="in_proj_msd_date",
+    msd_ref_date = st.text_input(
+        "MSD REF DATE (YYYY-MM-DD):",
+        key="in_msd_ref_date",
         placeholder="2024-06-30",
+        help="MSD reference date (usually before the start date).",
     ).strip()
 
     # -- Nature of involvement ----------------------------------------------
@@ -1454,10 +1445,8 @@ def main() -> None:
         invalid.append("END DATE (YYYY-MM-DD)")
     if start_date_of_employment and not is_valid_date(start_date_of_employment):
         invalid.append("START DATE OF EMPLOYMENT (YYYY-MM-DD)")
-    if cat1_msd_date and not is_valid_date(cat1_msd_date):
-        invalid.append("CAT 1 MSD DATE (YYYY-MM-DD)")
-    if project_clearance_msd_date and not is_valid_date(project_clearance_msd_date):
-        invalid.append("PROJECT CLEARANCE MSD DATE (YYYY-MM-DD)")
+    if msd_ref_date and not is_valid_date(msd_ref_date):
+        invalid.append("MSD REF DATE (YYYY-MM-DD)")
     if local is True and nric and not NRIC_PATTERN.match(nric):
         invalid.append("NRIC")
     if local is True and hp_email and "@" not in hp_email:
@@ -1491,10 +1480,9 @@ def main() -> None:
         "mobile_number": mobile_number,
         "start_date_of_employment": start_date_of_employment,
         "clearance_level": str(project["Clearance Level"]),
-        "cat1_msd_no": cat1_msd_no,
-        "cat1_msd_date": cat1_msd_date,
-        "project_clearance_msd_no": project_clearance_msd_no,
-        "project_clearance_msd_date": project_clearance_msd_date,
+        "clearance_category": clearance_category,
+        "msd_ref_number": msd_ref_number,
+        "msd_ref_date": msd_ref_date,
         "hp_email": hp_email,
         "company_appt": company_appt,
         "nature_of_involvement": nature_of_involvement
