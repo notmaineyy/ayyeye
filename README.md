@@ -44,21 +44,28 @@ Then open http://localhost:8501.
 1. Push this repo to GitHub.
 2. Go to https://share.streamlit.io and click **New app**.
 3. Pick the repo/branch and set the main file to `app.py`.
-4. Open **Advanced settings → Secrets** and add:
+4. Open **Advanced settings → Secrets** and add a key for a free/available
+   provider (Gemini has a free tier; Groq is also free):
 
    ```toml
-   OPENAI_API_KEY = "sk-your-key-here"
-   # OPENAI_BASE_URL = "https://api.openai.com/v1"   # optional
-   # OPENAI_MODEL = "gpt-4o-mini"
+   # Gemini (free key: https://aistudio.google.com/apikey)
+   GEMINI_API_KEY = "your-gemini-key"
+   # GEMINI_MODEL = "gemini-2.0-flash"
+
+   # …or any OpenAI-compatible provider (OpenAI / Groq / OpenRouter)
+   # OPENAI_API_KEY = "sk-your-key-here"
+   # OPENAI_BASE_URL = "https://api.groq.com/openai/v1"
+   # OPENAI_MODEL = "llama-3.3-70b-versatile"
+
    ACRES_ACCESS_CODE = "choose-a-code"
    ```
 
 5. Deploy. `packages.txt` installs Tesseract (OCR) automatically; the app uses
-   the cloud model when `OPENAI_API_KEY` is set, otherwise local Ollama.
+   the configured cloud model, otherwise local Ollama.
 
-> Note: on the cloud there is no Ollama, so an OpenAI-compatible key is
-> required for the AI features. Clearance data sent to that provider leaves
-> your machine — only use dummy data while testing.
+> Note: on the cloud there is no Ollama, so a key is required for the AI
+> features. Clearance data sent to that provider leaves your machine — only use
+> dummy data while testing.
 
 ## Share with colleagues (local tunnel)
 

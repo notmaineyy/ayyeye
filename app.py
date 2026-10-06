@@ -125,10 +125,15 @@ MIDDLE_MAN_EMAIL = "acres-coordinator@example.sg"
 # Model provider
 #
 # Locally the app uses Ollama. In the cloud (e.g. Streamlit Community Cloud)
-# there is no Ollama, so if an OpenAI-compatible API key is configured the app
-# uses that instead. Configure via Streamlit secrets or environment variables:
-#   OPENAI_API_KEY, OPENAI_BASE_URL (optional), OPENAI_MODEL (optional)
+# there is no Ollama, so if an API key is configured the app uses a cloud model
+# instead. Supported (via Streamlit secrets or environment variables):
+#   * Gemini (free tier)   - GEMINI_API_KEY (or GOOGLE_API_KEY)
+#   * OpenAI-compatible    - OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
+#                            (also works for Groq / OpenRouter / Together)
 # ---------------------------------------------------------------------------
+
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
 
 
 def get_secret(name: str) -> str:
@@ -142,21 +147,53 @@ def get_secret(name: str) -> str:
 
 
 def cloud_model_config() -> dict | None:
-    """Return cloud model settings when an API key is configured."""
+    """Return cloud model settings when an API key is configured.
+
+    Gemini takes precedence when its key is present; otherwise any
+    OpenAI-compatible key is used.
+    """
+    gemini_key = (
+        get_secret("GEMINI_API_KEY").strip() or get_secret("GOOGLE_API_KEY").strip()
+    )
+    if gemini_key:
+        return {
+            "provider": "Gemini",
+            "api_key": gemini_key,
+            "base_url": get_secret("OPENAI_BASE_URL").strip() or GEMINI_BASE_URL,
+            "model": get_secret("OPENAI_MODEL").strip()
+            or get_secret("GEMINI_MODEL").strip()
+            or GEMINI_DEFAULT_MODEL,
+        }
+
     api_key = get_secret("OPENAI_API_KEY").strip()
-    if not api_key:
-        return None
-    return {
-        "api_key": api_key,
-        "base_url": get_secret("OPENAI_BASE_URL").strip() or None,
-        "model": get_secret("OPENAI_MODEL").strip() or "gpt-4o-mini",
-    }
+    if api_key:
+        return {
+            "provider": "OpenAI-compatible",
+            "api_key": api_key,
+            "base_url": get_secret("OPENAI_BASE_URL").strip() or None,
+            "model": get_secret("OPENAI_MODEL").strip() or "gpt-4o-mini",
+        }
+    return None
 
 
 def active_provider() -> str:
     """Human-readable name of the active model provider."""
     config = cloud_model_config()
-    return f"cloud ({config['model']})" if config else f"local ({OLLAMA_MODEL})"
+    if config:
+        return f"{config['provider']} ({config['model']})"
+    return f"local Ollama ({OLLAMA_MODEL})"
+
+
+def _extract_json(text: str) -> str:
+    """Pull a JSON object out of a model reply (strips markdown fences)."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    start, end = text.find("{"), text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
 
 
 def chat(messages: list[dict], schema: dict | None = None) -> str:
@@ -180,7 +217,12 @@ def chat(messages: list[dict], schema: dict | None = None) -> str:
             }
             kwargs["messages"] = messages
             kwargs["response_format"] = {"type": "json_object"}
-        response = client.chat.completions.create(**kwargs)
+        try:
+            response = client.chat.completions.create(**kwargs)
+        except Exception:
+            # Some providers reject response_format; retry without it.
+            kwargs.pop("response_format", None)
+            response = client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 
     kwargs = {"model": OLLAMA_MODEL, "messages": messages}
@@ -760,7 +802,7 @@ def extract_document_details(text: str) -> dict[str, str]:
             ],
             schema=DocumentDetails.model_json_schema(),
         )
-        parsed = DocumentDetails.model_validate_json(content)
+        parsed = DocumentDetails.model_validate_json(_extract_json(content))
         result = {}
         for key, value in parsed.model_dump().items():
             cleaned = value.strip() if isinstance(value, str) else ""
@@ -901,72 +943,57 @@ def apply_document_details(details: dict[str, str]) -> None:
         st.session_state[widget_key] = value
 
 
-def _ai_fill_from_text(text: str, source: str) -> None:
-    """Shared helper: extract details from text and store a status message."""
+def _extract_fields(text: str, source: str) -> tuple[str, str, dict[str, str]]:
+    """Extract details from text.
+
+    Returns ``(kind, message, details)`` without applying anything, so callers
+    can apply the details at a safe point in the script run.
+    """
     text = (text or "").strip()
     if not text:
-        st.session_state["ai_message"] = (
-            "info",
-            f"Add some text in the {source} box first.",
-        )
-        return
+        return ("info", f"Add some text in the {source} box first.", {})
     try:
         details = extract_document_details(text)
     except Exception as exc:  # noqa: BLE001 - surface model errors to the user
-        st.session_state["ai_message"] = (
-            "error",
-            f"The assistant could not process that: {exc}",
-        )
-        return
+        return ("error", f"The assistant could not process that: {exc}", {})
+    st.session_state["last_details"] = details
     if details:
-        apply_document_details(details)
-        st.session_state["ai_message"] = (
+        return (
             "success",
             f"Assistant filled {len(details)} field(s) from your {source}: "
             + ", ".join(sorted(details)),
+            details,
         )
-    else:
-        st.session_state["ai_message"] = (
-            "warning",
-            "The assistant could not find any clearance details in that text.",
-        )
+    return (
+        "warning",
+        "The assistant could not find any clearance details in that text.",
+        {},
+    )
 
 
 def on_ai_autofill() -> None:
-    """Callback: fill the form from the pasted free text."""
-    _ai_fill_from_text(st.session_state.get("ai_text", ""), "pasted text")
+    """Callback: fill the form from the pasted free text.
 
-
-def on_read_documents() -> None:
-    """Callback: fill the form from uploaded PDF/image documents.
-
-    Runs as a button callback so the widget state is updated *before* the
-    script reruns, which lets it populate fields defined above the uploader.
+    Runs before the form fields are created, so it can apply directly.
     """
-    uploaded = st.session_state.get("doc_uploader") or []
-    if not uploaded:
-        st.session_state["ai_message"] = ("info", "Upload at least one document first.")
-        return
+    kind, message, details = _extract_fields(
+        st.session_state.get("ai_text", ""), "pasted text"
+    )
+    if details:
+        apply_document_details(details)
+    st.session_state["ai_message"] = (kind, message)
 
-    text_parts = []
-    errors = []
+
+def read_uploaded_documents(uploaded) -> tuple[str, list[str]]:
+    """Return (text, errors) for a list of uploaded PDF/image documents."""
+    text_parts: list[str] = []
+    errors: list[str] = []
     for doc in uploaded:
         try:
             text_parts.append(extract_text_from_document(doc))
         except Exception as exc:  # noqa: BLE001 - surface read errors
             errors.append(f"{doc.name}: {exc}")
-
-    text = "\n".join(text_parts).strip()
-    if errors:
-        st.session_state["ai_message"] = ("error", "Could not read: " + "; ".join(errors))
-        return
-    if not text:
-        st.session_state["ai_message"] = (
-            "warning",
-            "No readable text was found in the document(s), even after OCR.",
-        )
-        return
-    _ai_fill_from_text(text, "document(s)")
+    return "\n".join(text_parts).strip(), errors
 
 
 # ---------------------------------------------------------------------------
@@ -1057,6 +1084,12 @@ def main() -> None:
 
     render_header()
     render_instructions()
+
+    # Apply details extracted from an uploaded document (stashed before rerun,
+    # applied here before any fields are created so it can fill the whole form).
+    pending = st.session_state.pop("pending_details", None)
+    if pending:
+        apply_document_details(pending)
 
     # -- AI Intake Assistant (primary entry point) --------------------------
     st.markdown(
@@ -1224,13 +1257,65 @@ def main() -> None:
             "Upload the clearance document (PDF or image). The AI reads it and "
             "fills the MSD details and other fields above and below."
         )
-        st.file_uploader(
+        uploaded_docs = st.file_uploader(
             "Upload PDF or image document(s)",
             type=["pdf", "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp"],
             accept_multiple_files=True,
             key="doc_uploader",
         )
-        st.button("Read Documents with AI", on_click=on_read_documents)
+        if st.button("Read Documents with AI"):
+            if not uploaded_docs:
+                st.session_state["doc_message"] = (
+                    "info",
+                    "Upload at least one document first.",
+                )
+            else:
+                text, errors = read_uploaded_documents(uploaded_docs)
+                st.session_state["ocr_text"] = text
+                st.session_state["ocr_errors"] = errors
+                if errors:
+                    st.session_state["doc_message"] = (
+                        "error",
+                        "Could not read: " + "; ".join(errors),
+                    )
+                elif not text:
+                    st.session_state["doc_message"] = (
+                        "warning",
+                        "No readable text was found in the document(s), even "
+                        "after OCR. The file may be blank or very low quality.",
+                    )
+                else:
+                    kind, message, details = _extract_fields(text, "document(s)")
+                    st.session_state["doc_message"] = (kind, message)
+                    if details:
+                        # Re-run so the values are applied to fields that appear
+                        # above this uploader (at the top of the script).
+                        st.session_state["pending_details"] = details
+                        st.rerun()
+
+        # Show what happened, right where the uploader is.
+        _doc_message = st.session_state.pop("doc_message", None)
+        if _doc_message:
+            _kind, _text = _doc_message
+            getattr(st, _kind)(_text)
+
+        _ocr_errors = st.session_state.pop("ocr_errors", None)
+        if _ocr_errors:
+            for _err in _ocr_errors:
+                st.error(_err)
+
+        _ocr_text = st.session_state.get("ocr_text")
+        if _ocr_text is not None:
+            with st.expander("What the AI read (raw OCR text)", expanded=True):
+                if _ocr_text:
+                    st.code(_ocr_text, language="text")
+                else:
+                    st.write("(no text was read from the document)")
+
+        _details = st.session_state.get("last_details")
+        if _details:
+            with st.expander("Fields the AI found", expanded=False):
+                st.json(_details)
 
     st.markdown("**Clearance MSD Details**")
     cat1_msd_no = st.text_input("CAT 1 MSD NO:", key="in_cat1_no").strip()
