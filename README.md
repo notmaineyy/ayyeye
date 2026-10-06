@@ -39,7 +39,28 @@ python3 -m venv .venv
 
 Then open http://localhost:8501.
 
-## Share with colleagues (public link)
+## Deploy to Streamlit Community Cloud (public URL)
+
+1. Push this repo to GitHub.
+2. Go to https://share.streamlit.io and click **New app**.
+3. Pick the repo/branch and set the main file to `app.py`.
+4. Open **Advanced settings → Secrets** and add:
+
+   ```toml
+   OPENAI_API_KEY = "sk-your-key-here"
+   # OPENAI_BASE_URL = "https://api.openai.com/v1"   # optional
+   # OPENAI_MODEL = "gpt-4o-mini"
+   ACRES_ACCESS_CODE = "choose-a-code"
+   ```
+
+5. Deploy. `packages.txt` installs Tesseract (OCR) automatically; the app uses
+   the cloud model when `OPENAI_API_KEY` is set, otherwise local Ollama.
+
+> Note: on the cloud there is no Ollama, so an OpenAI-compatible key is
+> required for the AI features. Clearance data sent to that provider leaves
+> your machine — only use dummy data while testing.
+
+## Share with colleagues (local tunnel)
 
 ```bash
 ./run.sh

@@ -18,11 +18,13 @@ from __future__ import annotations
 
 import datetime as _dt
 import io
+import json
 import os
 import re
 from pathlib import Path
 
 import ollama
+import openai
 import pandas as pd
 import pymupdf
 import pytesseract
@@ -117,6 +119,75 @@ COMPANY_NAME = "DSTA (1 Depot Road S109679)"
 #: Who completed forms should be sent to for now (the current middle man).
 MIDDLE_MAN_NAME = "the ACRES clearance coordinator (current middle man)"
 MIDDLE_MAN_EMAIL = "acres-coordinator@example.sg"
+
+
+# ---------------------------------------------------------------------------
+# Model provider
+#
+# Locally the app uses Ollama. In the cloud (e.g. Streamlit Community Cloud)
+# there is no Ollama, so if an OpenAI-compatible API key is configured the app
+# uses that instead. Configure via Streamlit secrets or environment variables:
+#   OPENAI_API_KEY, OPENAI_BASE_URL (optional), OPENAI_MODEL (optional)
+# ---------------------------------------------------------------------------
+
+
+def get_secret(name: str) -> str:
+    """Read a setting from Streamlit secrets, then the environment."""
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:  # noqa: BLE001 - no secrets file configured
+        pass
+    return os.environ.get(name, "")
+
+
+def cloud_model_config() -> dict | None:
+    """Return cloud model settings when an API key is configured."""
+    api_key = get_secret("OPENAI_API_KEY").strip()
+    if not api_key:
+        return None
+    return {
+        "api_key": api_key,
+        "base_url": get_secret("OPENAI_BASE_URL").strip() or None,
+        "model": get_secret("OPENAI_MODEL").strip() or "gpt-4o-mini",
+    }
+
+
+def active_provider() -> str:
+    """Human-readable name of the active model provider."""
+    config = cloud_model_config()
+    return f"cloud ({config['model']})" if config else f"local ({OLLAMA_MODEL})"
+
+
+def chat(messages: list[dict], schema: dict | None = None) -> str:
+    """Send a chat request to the active provider and return the text reply.
+
+    When ``schema`` is given, the provider is asked to return JSON matching it.
+    """
+    config = cloud_model_config()
+    if config:
+        client = openai.OpenAI(api_key=config["api_key"], base_url=config["base_url"])
+        kwargs: dict = {"model": config["model"], "messages": messages}
+        if schema is not None:
+            messages = list(messages)
+            messages[0] = {
+                "role": "system",
+                "content": (
+                    messages[0]["content"]
+                    + "\nReturn ONLY a valid JSON object matching this JSON "
+                    "schema (no markdown): " + json.dumps(schema)
+                ),
+            }
+            kwargs["messages"] = messages
+            kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content or ""
+
+    kwargs = {"model": OLLAMA_MODEL, "messages": messages}
+    if schema is not None:
+        kwargs["format"] = schema
+    response = ollama.chat(**kwargs)
+    return response["message"]["content"]
 
 #: Validation patterns.
 NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z .'\-]{1,}$")
@@ -312,6 +383,12 @@ def normalize_date(value: str | None) -> str:
     """
     if not value:
         return ""
+    # ISO 8601 (including datetimes and timezones, e.g. 2025-02-01T00:00:00Z).
+    try:
+        parsed = _dt.datetime.fromisoformat(value.strip().replace("Z", "+00:00")).date()
+        return parsed.isoformat() if 1900 <= parsed.year <= 2100 else ""
+    except ValueError:
+        pass
     for fmt in (
         "%Y-%m-%d",
         "%Y/%m/%d",
@@ -327,7 +404,7 @@ def normalize_date(value: str | None) -> str:
         except ValueError:
             continue
     try:
-        parsed = pd.to_datetime(value, dayfirst=True).date()
+        parsed = pd.to_datetime(value).date()
         return parsed.isoformat() if 1900 <= parsed.year <= 2100 else ""
     except Exception:  # noqa: BLE001 - fall through to empty
         return ""
@@ -667,8 +744,7 @@ def extract_document_details(text: str) -> dict[str, str]:
     """
     result: dict[str, str] = {}
     for _ in range(2):  # retry once if the model returns nothing useful
-        response = ollama.chat(
-            model=OLLAMA_MODEL,
+        content = chat(
             messages=[
                 {
                     "role": "system",
@@ -682,9 +758,9 @@ def extract_document_details(text: str) -> dict[str, str]:
                 },
                 {"role": "user", "content": text},
             ],
-            format=DocumentDetails.model_json_schema(),
+            schema=DocumentDetails.model_json_schema(),
         )
-        parsed = DocumentDetails.model_validate_json(response["message"]["content"])
+        parsed = DocumentDetails.model_validate_json(content)
         result = {}
         for key, value in parsed.model_dump().items():
             cleaned = value.strip() if isinstance(value, str) else ""
@@ -732,8 +808,7 @@ def craft_nature(notes: str) -> str:
     Turns the user's own short description of their work into the
     'NATURE OF INVOLVEMENT' text without inventing unsupported detail.
     """
-    response = ollama.chat(
-        model=OLLAMA_MODEL,
+    response = chat(
         messages=[
             {
                 "role": "system",
@@ -749,7 +824,7 @@ def craft_nature(notes: str) -> str:
             {"role": "user", "content": notes},
         ],
     )
-    return response["message"]["content"].strip().strip('"')
+    return response.strip().strip('"')
 
 
 def build_acres_row(data: dict) -> pd.DataFrame:
@@ -953,7 +1028,7 @@ def render_access_gate() -> bool:
     When the ``ACRES_ACCESS_CODE`` environment variable is set, visitors must
     enter that code first. When it is unset, access is open (local use).
     """
-    access_code = os.environ.get("ACRES_ACCESS_CODE", "").strip()
+    access_code = get_secret("ACRES_ACCESS_CODE").strip()
     if not access_code or st.session_state.get("authed"):
         return True
 
@@ -1012,6 +1087,7 @@ def main() -> None:
         type="primary",
         on_click=on_ai_autofill,
     )
+    st.caption(f"Model provider: {active_provider()}")
     _ai_message = st.session_state.pop("ai_message", None)
     if _ai_message:
         _kind, _text = _ai_message

@@ -1,5 +1,6 @@
 streamlit>=1.30
 ollama>=0.3
+openai>=1.30
 pydantic>=2.0
 pandas>=2.0
 pymupdf>=1.24
