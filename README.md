@@ -3,6 +3,16 @@
 A local Streamlit intake form that uses a local LLM (Ollama + `llama3.1`) to
 help raise ACRES security clearance requests. No cloud AI services are used.
 
+## Pitch deck
+
+A pitch deck explaining the idea and product is in `pitch/`:
+
+- `pitch/acres_pitch_deck.html` — open in a browser; ← / → to navigate, print
+  to PDF.
+- `pitch/acres_pitch_deck.pptx` — editable PowerPoint (14 slides).
+- `pitch/pitch_deck.md` — the content/outline in Markdown.
+- `pitch/make_pptx.py` — regenerates the `.pptx`.
+
 ## What it does
 
 - **AI Intake Assistant**: paste an email/message/notes and the local AI fills

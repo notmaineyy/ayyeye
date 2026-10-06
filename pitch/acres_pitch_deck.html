@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACRES Clearance Automated Intake — Pitch Deck</title>
+<style>
+  :root {
+    --navy: #18418A;
+    --navy-dark: #102E63;
+    --orange: #F26522;
+    --teal: #009E73;
+    --ink: #1A1A1A;
+    --muted: #5A6472;
+    --gray: #F4F6F8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--gray);
+    overflow: hidden;
+  }
+  .slide {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    padding: 7vh 9vw;
+    background: #FFFFFF;
+    border-left: 14px solid var(--navy);
+  }
+  .slide.active { display: flex; }
+  .kicker {
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--orange);
+    margin-bottom: 1.2rem;
+  }
+  h1 { font-size: 3.4rem; line-height: 1.08; color: var(--navy); margin: 0 0 1rem; }
+  h2 { font-size: 2.5rem; line-height: 1.12; color: var(--navy); margin: 0 0 1.4rem; }
+  p { font-size: 1.25rem; line-height: 1.55; color: #2A3442; margin: 0 0 0.9rem; max-width: 60ch; }
+  .sub { font-size: 1.4rem; color: var(--muted); max-width: 62ch; }
+  ul { font-size: 1.25rem; line-height: 1.7; color: #2A3442; margin: 0; padding-left: 1.2rem; max-width: 62ch; }
+  li { margin-bottom: 0.55rem; }
+  strong { color: var(--navy); }
+  .accent { color: var(--orange); }
+  .teal { color: var(--teal); }
+  .pills { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.4rem; }
+  .pill {
+    background: var(--gray);
+    border: 1px solid #DDE3EA;
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    font-size: 1rem;
+    color: var(--navy);
+    font-weight: 600;
+  }
+  .cols { display: flex; gap: 3.5rem; align-items: flex-start; }
+  .cols > div { flex: 1; }
+  .card {
+    background: var(--gray);
+    border-left: 6px solid var(--navy);
+    border-radius: 8px;
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 0.9rem;
+  }
+  .card.orange { border-left-color: var(--orange); }
+  .card.teal { border-left-color: var(--teal); }
+  .card h3 { margin: 0 0 0.3rem; font-size: 1.15rem; color: var(--navy); }
+  .card p { margin: 0; font-size: 1.05rem; }
+  .big { font-size: 1.9rem; font-weight: 700; color: var(--navy); margin: 0 0 0.4rem; }
+  .brandbar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.6rem; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--orange); }
+  .brandname { font-weight: 800; color: var(--navy); letter-spacing: 0.5px; }
+  .nav {
+    position: fixed; bottom: 18px; right: 22px; display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.9); border: 1px solid #DDE3EA; border-radius: 999px;
+    padding: 6px 14px; font-size: 0.9rem; color: var(--muted); z-index: 10;
+  }
+  .nav button {
+    border: none; background: var(--navy); color: #fff; width: 30px; height: 30px;
+    border-radius: 50%; font-size: 1rem; cursor: pointer; line-height: 1;
+  }
+  .nav button:hover { background: var(--navy-dark); }
+  .hint { position: fixed; bottom: 18px; left: 22px; font-size: 0.85rem; color: #97A1AE; z-index: 10; }
+  @media print {
+    body { overflow: visible; background: #fff; }
+    .slide { position: relative; display: flex !important; height: 100vh; page-break-after: always; border-left-width: 12px; }
+    .nav, .hint { display: none; }
+    @page { size: landscape; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<section class="slide active">
+  <div class="brandbar"><span class="dot"></span><span class="brandname">ACRES</span></div>
+  <div class="kicker">Clearance, cleared</div>
+  <h1>ACRES Clearance<br>Automated Intake</h1>
+  <p class="sub">A self-serve portal that turns a messy clearance request into a
+  ready-to-submit ACRES row and routes it straight to the project executive —
+  <strong>no middleman</strong>.</p>
+  <div class="pills">
+    <span class="pill">Self-serve</span>
+    <span class="pill">AI-assisted</span>
+    <span class="pill">Working prototype</span>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">The problem</div>
+  <h2>Clearance is slow, fragmented and error-prone</h2>
+  <ul>
+    <li>A complex, <strong>20+ column Excel sheet</strong> must be filled perfectly.</li>
+    <li>Project details — ops manager, department, clearance level — are scattered.</li>
+    <li>Applicants manually decode <strong>clearance categories</strong> and <strong>MSD reference numbers</strong>.</li>
+    <li>Requests bounce through a <strong>middleman</strong> before the project executive.</li>
+    <li>Wrong or incomplete rows cause <strong>rework and delay</strong>.</li>
+    <li>Sensitive data is handled ad hoc over email.</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <div class="kicker">The cost</div>
+  <h2>Every hop and typo adds days</h2>
+  <div class="cols">
+    <div>
+      <div class="card orange"><h3>Days of waiting</h3><p>Per clearance, multiplied across a project.</p></div>
+      <div class="card orange"><h3>Rework loops</h3><p>Between applicant, middleman and executive.</p></div>
+    </div>
+    <div>
+      <div class="card orange"><h3>Risk</h3><p>Sensitive details scattered across email and spreadsheets.</p></div>
+      <div class="card orange"><h3>No standard</h3><p>Every request is formatted differently.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">The solution</div>
+  <h2>A self-serve portal that does the work for you</h2>
+  <ul>
+    <li>Paste an email, or upload a <strong>PDF / image</strong> clearance document.</li>
+    <li>AI extracts and validates every required field.</li>
+    <li>Project details <strong>auto-fill</strong> from a project register.</li>
+    <li>Produces a standardized, ready-to-submit <strong>ACRES row</strong>.</li>
+    <li>Packages it and routes it <strong>directly to the project executive</strong>.</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <div class="kicker">How it works</div>
+  <h2>From messy input to routed request</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>1 · Input</h3><p>Paste text or upload a scanned PDF/image.</p></div>
+      <div class="card"><h3>2 · Read</h3><p>OCR turns documents into text.</p></div>
+      <div class="card"><h3>3 · Understand</h3><p>A language model extracts fields, constrained to a strict schema.</p></div>
+    </div>
+    <div>
+      <div class="card teal"><h3>4 · Verify</h3><p>Deterministic parsing for MSD <code>M/…</code>, categories like <code>1A</code>/<code>02</code>/<code>2B</code>, and dates; format checks for NRIC, mobile.</p></div>
+      <div class="card teal"><h3>5 · Assemble</h3><p>Merge with the project register into one ACRES row.</p></div>
+      <div class="card orange"><h3>6 · Route</h3><p>Package and send to the project executive.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Where AI is used — and where it isn't</div>
+  <h2>AI for language. Code for critical values.</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>AI does</h3>
+        <p>Reading documents, extracting fields, and drafting the
+        “Nature of Involvement” sentence.</p></div>
+    </div>
+    <div>
+      <div class="card teal"><h3>Deterministic code does</h3>
+        <p>MSD reference numbers, clearance categories, dates, project lookup,
+        validation and the final row.</p></div>
+      <div class="card orange"><h3>Human-in-the-loop</h3>
+        <p>Anything missing or mis-formatted is flagged for the user to fix.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Key features</div>
+  <h2>Everything needed, built in</h2>
+  <div class="cols">
+    <div>
+      <ul>
+        <li><strong>AI Intake Assistant</strong> — paste anything, form fills itself.</li>
+        <li><strong>Document OCR</strong> — scanned PDFs and photos of forms.</li>
+        <li><strong>Smart conditionals</strong> — locals vs foreigners; visit-reference country rules.</li>
+        <li><strong>Format validation</strong> — NRIC, dates, mobile, email.</li>
+      </ul>
+    </div>
+    <div>
+      <ul>
+        <li><strong>Project auto-fill</strong> — location, end date, ops manager, clearance level, department, executive.</li>
+        <li><strong>Direct routing</strong> — recipient pre-filled; one-click email package.</li>
+        <li><strong>Flexible AI backend</strong> — local (private) or cloud; free tiers supported.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Why it's different</div>
+  <h2>It removes the middleman — not just digitises the form</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>Hybrid intelligence</h3><p>LLM for language; deterministic code for critical values.</p></div>
+      <div class="card teal"><h3>Privacy options</h3><p>Can run fully local — clearance data never leaves the machine.</p></div>
+    </div>
+    <div>
+      <div class="card orange"><h3>Self-serve</h3><p>Applicants complete it themselves, correctly, first time.</p></div>
+      <div class="card"><h3>Standardized</h3><p>Same validated ACRES row for every project and person type.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Who it's for</div>
+  <h2>Built for everyone in the clearance chain</h2>
+  <div class="pills">
+    <span class="pill">Applicants</span>
+    <span class="pill">Project executives</span>
+    <span class="pill">Ops managers</span>
+    <span class="pill">Project / security admin</span>
+  </div>
+  <p style="margin-top:1.6rem">Applicants complete the form; executives receive a
+  ready package; ops managers endorse; admin teams get consistency and an audit trail.</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">Impact</div>
+  <h2>Faster, cleaner, safer</h2>
+  <div class="cols">
+    <div>
+      <div class="card teal"><h3>Faster</h3><p>Minutes instead of days of back-and-forth.</p></div>
+      <div class="card teal"><h3>More accurate</h3><p>Validated, standardized rows; fewer rework loops.</p></div>
+    </div>
+    <div>
+      <div class="card"><h3>Less admin</h3><p>The middleman step is eliminated.</p></div>
+      <div class="card"><h3>Safer &amp; scalable</h3><p>Privacy-preserving local AI; one flow for every project.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Status</div>
+  <h2>A working prototype, not a slide</h2>
+  <ul>
+    <li>Deployed and iterated with real feedback.</li>
+    <li>Reads real <strong>scanned</strong> clearance documents (OCR + AI).</li>
+    <li>Handles the full ACRES field set and <strong>per-project routing</strong>.</li>
+    <li>AI backend options integrated: <strong>local Ollama</strong>, Gemini free
+        tier, OpenCode Go, any OpenAI-compatible provider.</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <div class="kicker">Roadmap</div>
+  <h2>From prototype to production</h2>
+  <ul>
+    <li>Real email sending (SMTP/API) with delivery receipts.</li>
+    <li>Live project-register integration and SSO / role-based access.</li>
+    <li>Audit trail and submission tracking.</li>
+    <li>Multiple clearance rows per applicant; category-aware routing.</li>
+    <li>Analytics: time-to-clearance, error rates, bottlenecks.</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <div class="kicker">Risks &amp; mitigations</div>
+  <h2>Handled deliberately</h2>
+  <div class="cols">
+    <div>
+      <div class="card orange"><h3>Sensitive data</h3><p>Local model option; access codes; minimal retention.</p></div>
+      <div class="card orange"><h3>Model accuracy</h3><p>Schema constraints + deterministic parsing + human review.</p></div>
+    </div>
+    <div>
+      <div class="card"><h3>Adoption</h3><p>Works alongside the existing Excel template; low training.</p></div>
+      <div class="card"><h3>Process variation</h3><p>Routing is configurable per project.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">The ask</div>
+  <h1>Let's clear the middleman.</h1>
+  <ul>
+    <li><strong>Pilot</strong> with one project team.</li>
+    <li>Gather feedback from applicants, ops managers and project executives.</li>
+    <li>Measure time-to-clearance and rework, before and after.</li>
+    <li>Expand to more projects.</li>
+  </ul>
+</section>
+
+<div class="hint">Use ← / → or Space to navigate · Cmd/Ctrl+P to export to PDF</div>
+<div class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <span id="counter">1 / 14</span>
+  <button id="next" aria-label="Next">›</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let i = 0;
+  const counter = document.getElementById('counter');
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    counter.textContent = (i + 1) + ' / ' + slides.length;
+    location.hash = i + 1;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  document.getElementById('next').onclick = () => show(i + 1);
+  document.getElementById('prev').onclick = () => show(i - 1);
+  document.addEventListener('click', (e) => { if (!e.target.closest('.nav')) show(i + 1); });
+  const start = parseInt(location.hash.replace('#', ''), 10);
+  show(Number.isFinite(start) && start > 0 ? start - 1 : 0);
+</script>
+</body>
+</html>
