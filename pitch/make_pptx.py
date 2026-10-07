@@ -9,7 +9,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 NAVY = RGBColor(0x18, 0x41, 0x8A)
@@ -21,7 +21,8 @@ MUTED = RGBColor(0x5A, 0x64, 0x72)
 GRAY = RGBColor(0xF4, 0xF6, 0xF8)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
-FONT = "Helvetica Neue"
+# Arial renders identically on Google Slides, macOS and Windows.
+FONT = "Arial"
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
 
@@ -39,6 +40,7 @@ def add_text(slide, left, top, width, height, runs, align=PP_ALIGN.LEFT, anchor=
     box = slide.shapes.add_textbox(left, top, width, height)
     tf = box.text_frame
     tf.word_wrap = True
+    tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
     tf.vertical_anchor = anchor
     for idx, (text, size, bold, color, space_after) in enumerate(runs):
         p = tf.paragraphs[0] if idx == 0 else tf.add_paragraph()
@@ -331,6 +333,35 @@ def build():
     total = len(slides)
     for n, s in enumerate(slides, start=1):
         add_footer(s, n, total)
+
+    notes = [
+        "Today, getting ACRES clearance is a manual, multi-step chase. We built "
+        "a tool that collapses it into one self-serve flow.",
+        "Every hop and every typo adds days. Applicants decode categories and "
+        "MSD numbers by hand, then chase project details.",
+        "The real cost is time: waiting, rework loops, and risk from scattered "
+        "sensitive data.",
+        "The middleman disappears — the applicant goes straight to the person "
+        "who submits for clearance.",
+        "Paste or upload, AI extracts, deterministic code verifies the critical "
+        "codes, then we assemble and route.",
+        "We deliberately don't trust the model with reference numbers — those "
+        "are parsed deterministically, so we get AI's flexibility without its "
+        "hallucinations.",
+        "Everything needed is already built: assistant, OCR, conditionals, "
+        "validation, auto-fill and routing.",
+        "It doesn't just digitise the form — it removes the middleman and keeps "
+        "a private, local option.",
+        "Applicants, executives, ops managers and admin teams all benefit.",
+        "Faster, more accurate, less admin, safer and scalable across projects.",
+        "This is a working prototype, tested on real scanned clearance documents.",
+        "Next: real email sending, live register + SSO, audit trail and analytics.",
+        "Sensitive data and model accuracy are handled with local AI and "
+        "deterministic parsing.",
+        "The ask: pilot with one project team and measure the before/after.",
+    ]
+    for s, note in zip(slides, notes):
+        s.notes_slide.notes_text_frame.text = note
 
     out = Path(__file__).with_name("acres_pitch_deck.pptx")
     prs.save(out)
