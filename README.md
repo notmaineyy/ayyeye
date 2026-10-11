@@ -31,7 +31,18 @@ A pitch deck explaining the idea and product is in `pitch/`:
 - Produces a copy-ready row and saves it as `<Name>_ACRES_ready.csv`.
 - Final step packages the details and routes them to the project executive
   (pre-filled from the project's department), removing the middleman.
-- Shows who to send the completed form to for feedback.
+- **Internal / External modes**: external parties enter a project *temp code*
+  (e.g. `ALPHA-7X3K`); the real project details are attached automatically and
+  stay hidden from them.
+- **Simulated SMS OTP** verification before sending (demo; no real SMS sent).
+- **Fake demo data**: a "Generate sample document" button plus committed sample
+  files in `samples/` (Republic of Pineapple) for safe testing.
+
+## Fake demo data
+
+- In the app: **Generate sample document (demo)** in the document-import panel.
+- Committed files: `samples/fake_clearance.png` / `.pdf` (obviously fake).
+- Regenerate with `.venv/bin/python make_samples.py`.
 
 ## Prerequisites
 
@@ -71,10 +82,14 @@ Then open http://localhost:8501.
    # …or Gemini (free key: https://aistudio.google.com/apikey)
    # GEMINI_API_KEY = "your-gemini-key"
 
-   # …or any OpenAI-compatible provider (OpenAI / Groq / OpenRouter)
-   # OPENAI_API_KEY = "sk-your-key-here"
-   # OPENAI_BASE_URL = "https://api.groq.com/openai/v1"
-   # OPENAI_MODEL = "llama-3.3-70b-versatile"
+   # …or OpenAI API Platform / "ChatGPT Enterprise" (PLACEHOLDER, inactive)
+   # OPENAI_API_KEY = "sk-..."
+   # OPENAI_ORGANIZATION = "org-..."
+   # OPENAI_PROJECT = "proj_..."
+   # OPENAI_MODEL = "gpt-4o-mini"
+
+   # Lock the app to one provider: "openai" | "gemini" | "opencode"
+   # FORCE_PROVIDER = "openai"
 
    ACRES_ACCESS_CODE = "choose-a-code"
    ```
@@ -82,7 +97,10 @@ Then open http://localhost:8501.
 5. Deploy. `packages.txt` installs Tesseract (OCR) automatically; the app uses
    the configured cloud model, otherwise local Ollama.
 
-> Provider precedence: OpenCode Go → Gemini → OpenAI-compatible → local Ollama.
+> Enterprise access is via the OpenAI **API Platform** organization, which is
+> separate from a ChatGPT Enterprise workspace. The enterprise keys are
+> placeholders and inactive until filled in.
+> Provider precedence: OpenCode Go → Gemini → OpenAI → local Ollama.
 > On the cloud there is no Ollama, so a key is required for the AI features.
 > Clearance data sent to that provider leaves your machine — only use dummy
 > data while testing.

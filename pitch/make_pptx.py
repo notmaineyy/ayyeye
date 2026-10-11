@@ -245,7 +245,19 @@ def build():
     ], size=16)
     slides.append(s)
 
-    # 8. Differentiators
+    # 8. Internal & external parties
+    s = prs.slides.add_slide(blank); add_left_bar(s)
+    add_kicker(s, "Built for internal and external parties")
+    add_title(s, "External parties never see the real project details")
+    add_cards(s, [
+        ("Internal", "Knows the project; selects it and sees all project fields.", NAVY),
+        ("External", "Enters a confidential project code (e.g. ALPHA-7X3K).", ORANGE),
+        ("Auto-resolved", "The real project details are attached automatically.", TEAL),
+        ("Kept confidential", "Name, location, ops manager and clearance level stay hidden.", TEAL),
+    ])
+    slides.append(s)
+
+    # 9. Differentiators
     s = prs.slides.add_slide(blank); add_left_bar(s)
     add_kicker(s, "Why it's different")
     add_title(s, "It removes the middleman — not just digitises the form")
@@ -292,7 +304,19 @@ def build():
     ], size=17)
     slides.append(s)
 
-    # 12. Roadmap
+    # 12. Safe demos & enterprise-ready
+    s = prs.slides.add_slide(blank); add_left_bar(s)
+    add_kicker(s, "Safe to demo, ready for enterprise")
+    add_title(s, "No real data, no lock-in")
+    add_cards(s, [
+        ("Fake demo data", "A one-click sample document (Republic of Pineapple) — demos never touch real data.", ORANGE),
+        ("Enterprise AI", "Ready for the OpenAI API Platform; lock the app to one approved provider.", NAVY),
+        ("Mobile verification", "A verification code confirms the submission (simulated for now).", TEAL),
+        ("Privacy first", "Can run fully local; project details stay confidential from external parties.", TEAL),
+    ])
+    slides.append(s)
+
+    # 13. Roadmap
     s = prs.slides.add_slide(blank); add_left_bar(s)
     add_kicker(s, "Roadmap")
     add_title(s, "From prototype to production")
@@ -350,11 +374,16 @@ def build():
         "hallucinations.",
         "Everything needed is already built: assistant, OCR, conditionals, "
         "validation, auto-fill and routing.",
+        "External parties often don't know the project. They enter a "
+        "confidential code; the real project details are attached automatically "
+        "and never shown to them.",
         "It doesn't just digitise the form — it removes the middleman and keeps "
         "a private, local option.",
         "Applicants, executives, ops managers and admin teams all benefit.",
         "Faster, more accurate, less admin, safer and scalable across projects.",
         "This is a working prototype, tested on real scanned clearance documents.",
+        "Demos use obviously fake data, the AI is ready for the enterprise "
+        "provider, and a mobile code confirms the submission.",
         "Next: real email sending, live register + SSO, audit trail and analytics.",
         "Sensitive data and model accuracy are handled with local AI and "
         "deterministic parsing.",

@@ -20,6 +20,7 @@ import datetime as _dt
 import io
 import json
 import os
+import random
 import re
 import urllib.parse
 import uuid
@@ -31,7 +32,7 @@ import pandas as pd
 import pymupdf
 import pytesseract
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -136,6 +137,10 @@ PROJECT_EXECUTIVE_EMAIL = "abc@dsta.gov.sg"
 #   * Gemini (free tier)   - GEMINI_API_KEY / GOOGLE_API_KEY
 #   * OpenAI-compatible    - OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 #                            (also works for Groq / OpenRouter / Together)
+#
+# Enterprise (OpenAI API Platform / "ChatGPT Enterprise") is supported but
+# INACTIVE until its key is provided. Set OPENAI_API_KEY (+ OPENAI_ORGANIZATION,
+# OPENAI_PROJECT) and optionally FORCE_PROVIDER="openai" to lock the app to it.
 # ---------------------------------------------------------------------------
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
@@ -155,11 +160,61 @@ def get_secret(name: str) -> str:
     return os.environ.get(name, "")
 
 
+def openai_model_config() -> dict | None:
+    """Return the OpenAI (enterprise API Platform) config, if a key is set."""
+    api_key = get_secret("OPENAI_API_KEY").strip()
+    if not api_key:
+        return None
+    return {
+        "provider": "OpenAI",
+        "api_key": api_key,
+        "base_url": get_secret("OPENAI_BASE_URL").strip() or None,
+        "model": get_secret("OPENAI_MODEL").strip() or "gpt-4o-mini",
+        "organization": get_secret("OPENAI_ORGANIZATION").strip() or None,
+        "project": get_secret("OPENAI_PROJECT").strip() or None,
+    }
+
+
 def cloud_model_config() -> dict | None:
     """Return cloud model settings when an API key is configured.
 
-    OpenCode Go takes precedence, then Gemini, then any OpenAI-compatible key.
+    OpenCode Go takes precedence, then Gemini, then OpenAI (enterprise). A
+    ``FORCE_PROVIDER`` secret can lock the app to a single provider.
     """
+    forced = get_secret("FORCE_PROVIDER").strip().lower()
+
+    if forced == "openai":
+        return openai_model_config()
+    if forced == "gemini":
+        forced_key = (
+            get_secret("GEMINI_API_KEY").strip() or get_secret("GOOGLE_API_KEY").strip()
+        )
+        if forced_key:
+            return {
+                "provider": "Gemini",
+                "api_key": forced_key,
+                "base_url": get_secret("OPENAI_BASE_URL").strip() or GEMINI_BASE_URL,
+                "model": get_secret("OPENAI_MODEL").strip()
+                or get_secret("GEMINI_MODEL").strip()
+                or GEMINI_DEFAULT_MODEL,
+            }
+        return None
+    if forced == "opencode":
+        forced_key = (
+            get_secret("OPENCODE_API_KEY").strip()
+            or get_secret("OPENCODE_GO_API_KEY").strip()
+        )
+        if forced_key:
+            return {
+                "provider": "OpenCode Go",
+                "api_key": forced_key,
+                "base_url": get_secret("OPENCODE_BASE_URL").strip()
+                or OPENCODE_GO_BASE_URL,
+                "model": get_secret("OPENCODE_MODEL").strip()
+                or OPENCODE_GO_DEFAULT_MODEL,
+            }
+        return None
+
     opencode_key = (
         get_secret("OPENCODE_API_KEY").strip()
         or get_secret("OPENCODE_GO_API_KEY").strip()
@@ -186,15 +241,7 @@ def cloud_model_config() -> dict | None:
             or GEMINI_DEFAULT_MODEL,
         }
 
-    api_key = get_secret("OPENAI_API_KEY").strip()
-    if api_key:
-        return {
-            "provider": "OpenAI-compatible",
-            "api_key": api_key,
-            "base_url": get_secret("OPENAI_BASE_URL").strip() or None,
-            "model": get_secret("OPENAI_MODEL").strip() or "gpt-4o-mini",
-        }
-    return None
+    return openai_model_config()
 
 
 def active_provider() -> str:
@@ -241,8 +288,19 @@ def chat(messages: list[dict], schema: dict | None = None) -> str:
     When ``schema`` is given, the provider is asked to return JSON matching it.
     """
     config = cloud_model_config()
+    if config is None and get_secret("FORCE_PROVIDER").strip():
+        raise RuntimeError(
+            "The app is locked to provider "
+            f"'{get_secret('FORCE_PROVIDER').strip()}' but its API key is not "
+            "configured. Add the key or unset FORCE_PROVIDER."
+        )
     if config:
-        client = openai.OpenAI(api_key=config["api_key"], base_url=config["base_url"])
+        client = openai.OpenAI(
+            api_key=config["api_key"],
+            base_url=config["base_url"],
+            organization=config.get("organization"),
+            project=config.get("project"),
+        )
         kwargs: dict = {"model": config["model"], "messages": messages}
         if config["provider"] == "OpenCode Go":
             # OpenCode Go requires a stable session id and a client user agent.
@@ -593,6 +651,62 @@ def extract_text_from_document(uploaded_file) -> str:
         return extract_text_from_image(uploaded_file)
 
 
+#: Obvious fake data for safe demos — never real people or projects.
+SAMPLE_DOC_LINES = [
+    "REPUBLIC OF PINEAPPLE - CLEARANCE FORM",
+    "Full Name: Pineapple Pete",
+    "NRIC: S0000000A",
+    "Nationality: Pineapplean",
+    "Country of Birth: Republic of Pineapple",
+    "Date of Birth: 01 Jan 1990",
+    "Religion: Pastafarian",
+    "Gender: Male",
+    "Mobile Number: 90000000",
+    "Appointment/Designation: Chief Pineapple Officer",
+    "Start Date of Employment: 01 Jan 2020",
+    "Clearance Category: 1A",
+    "MSD Ref Number: M/202500000000000",
+    "MSD Ref Date: 30 June 2024",
+    "Start Date: 01 Feb 2025",
+    "End Date: 31 Jan 2026",
+]
+
+
+def _sample_font(size: int):
+    for path in (
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ):
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:  # noqa: BLE001 - fall back to the default font
+            continue
+    return ImageFont.load_default()
+
+
+def generate_sample_document() -> bytes:
+    """Render an obviously fake clearance document as PNG bytes for demos."""
+    image = Image.new("RGB", (1240, 1560), "white")
+    draw = ImageDraw.Draw(image)
+    body_font = _sample_font(30)
+    title_font = _sample_font(40)
+    y = 60
+    for index, line in enumerate(SAMPLE_DOC_LINES):
+        draw.text((60, y), line, fill="black", font=title_font if index == 0 else body_font)
+        y += 80 if index == 0 else 60
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class SampleFile(io.BytesIO):
+    """A file-like object that mimics an uploaded file (name + read)."""
+
+    def __init__(self, data: bytes, name: str):
+        super().__init__(data)
+        self.name = name
+
+
 #: Column labels used in clearance tables/forms, matched against upper-cased text.
 _MSD_COLUMN_PATTERNS = [
     ("category", re.compile(r"CLEARANCE\s+CATEGORY")),
@@ -871,6 +985,39 @@ def lookup_project(project_name: str | None) -> pd.Series | None:
     return matches.iloc[0]
 
 
+def lookup_by_temp_code(code: str | None) -> pd.Series | None:
+    """Find a project by its external temp code (case-insensitive, exact)."""
+    if not code:
+        return None
+    projects = load_projects()
+    if "Temp Code" not in projects.columns:
+        return None
+    matches = projects[
+        projects["Temp Code"].astype(str).str.strip().str.upper() == code.strip().upper()
+    ]
+    if matches.empty:
+        return None
+    return matches.iloc[0]
+
+
+#: Project-derived columns that must stay hidden from external parties.
+PROJECT_COLUMNS = [
+    "PROJECT NAME",
+    "LOCATION OF WORK IN DETAIL",
+    "OPS MANAGER ENDORSEMENT",
+    "CLEARANCE LEVEL",
+]
+
+
+def mask_project_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy with project-derived columns masked for external users."""
+    masked = df.copy()
+    for column in PROJECT_COLUMNS:
+        if column in masked.columns:
+            masked[column] = "••• (confidential)"
+    return masked
+
+
 def safe_filename(name: str) -> str:
     """Turn a person's name into a filesystem-safe token."""
     cleaned = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
@@ -1048,6 +1195,42 @@ def read_uploaded_documents(uploaded) -> tuple[str, list[str]]:
         except Exception as exc:  # noqa: BLE001 - surface read errors
             errors.append(f"{doc.name}: {exc}")
     return "\n".join(text_parts).strip(), errors
+
+
+def handle_documents(uploaded) -> None:
+    """Read documents, extract details, and stash them for the next run.
+
+    Shared by the upload and "generate sample document" buttons.
+    """
+    if not uploaded:
+        st.session_state["doc_message"] = (
+            "info",
+            "Upload at least one document first.",
+        )
+        return
+    text, errors = read_uploaded_documents(uploaded)
+    st.session_state["ocr_text"] = text
+    st.session_state["ocr_errors"] = errors
+    if errors:
+        st.session_state["doc_message"] = (
+            "error",
+            "Could not read: " + "; ".join(errors),
+        )
+        return
+    if not text:
+        st.session_state["doc_message"] = (
+            "warning",
+            "No readable text was found in the document(s), even after OCR. "
+            "The file may be blank or very low quality.",
+        )
+        return
+    kind, message, details = _extract_fields(text, "document(s)")
+    st.session_state["doc_message"] = (kind, message)
+    if details:
+        # Re-run so the values are applied to fields that appear above this
+        # uploader (at the top of the script).
+        st.session_state["pending_details"] = details
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -1248,14 +1431,48 @@ def main() -> None:
     # -- Project & clearance details ----------------------------------------
     st.subheader("Project & Clearance Details")
     projects = load_projects()
-    selected_project = st.selectbox(
-        "PROJECT NAME:",
-        options=projects["Project Name"].tolist(),
-        index=None,
-        placeholder="Select a project...",
-        key="sel_project",
+    submitter_mode = st.radio(
+        "How are you providing the project?",
+        options=[
+            "Internal — I know the project name",
+            "External — I have a project code",
+        ],
+        index=0,
+        horizontal=True,
+        key="submitter_mode",
     )
-    project = lookup_project(selected_project) if selected_project else None
+    external = submitter_mode.startswith("External")
+
+    project = None
+    selected_project = None
+    temp_code = ""
+    if external:
+        temp_code = st.text_input(
+            "PROJECT CODE:",
+            key="in_temp_code",
+            placeholder="e.g. ALPHA-7X3K",
+            help="The code you were given. Project details are attached confidentially.",
+        ).strip()
+        project = lookup_by_temp_code(temp_code) if temp_code else None
+        if temp_code and project is None:
+            st.error("That project code was not recognised. Please check and try again.")
+        elif project is not None:
+            st.success(
+                "Project code verified. Project details are attached confidentially."
+            )
+        st.caption(
+            "Project-specific details (name, location, end date, ops manager and "
+            "clearance level) are attached automatically and are not shown here."
+        )
+    else:
+        selected_project = st.selectbox(
+            "PROJECT NAME:",
+            options=projects["Project Name"].tolist(),
+            index=None,
+            placeholder="Select a project...",
+            key="sel_project",
+        )
+        project = lookup_project(selected_project) if selected_project else None
 
     purpose_of_clearance = st.selectbox(
         "PURPOSE OF CLEARANCE:",
@@ -1268,29 +1485,33 @@ def main() -> None:
         "START DATE (YYYY-MM-DD):", key="in_start_date", placeholder="2026-01-01"
     ).strip()
 
-    # End date comes from the uploaded document if present, else the project.
-    if project is not None and not st.session_state.get("in_end_date"):
-        st.session_state["in_end_date"] = project["End Date"]
-    end_date = st.text_input(
-        "END DATE (YYYY-MM-DD):", key="in_end_date", placeholder="2026-12-31"
-    ).strip()
+    if external:
+        # End date is project-derived and stays hidden from external parties.
+        end_date = project["End Date"] if project is not None else ""
+    else:
+        # End date comes from the uploaded document if present, else the project.
+        if project is not None and not st.session_state.get("in_end_date"):
+            st.session_state["in_end_date"] = project["End Date"]
+        end_date = st.text_input(
+            "END DATE (YYYY-MM-DD):", key="in_end_date", placeholder="2026-12-31"
+        ).strip()
 
-    # Auto-filled from the selected project's register entry.
-    st.text_input(
-        "LOCATION OF WORK IN DETAIL (auto-filled, eg CNB, Blk 161):",
-        value=project["Location of Work"] if project is not None else "",
-        disabled=True,
-    )
-    st.text_input(
-        "OPS MANAGER ENDORSEMENT (auto-filled, Rank, Name & Appt):",
-        value=project["Ops Manager Endorsement"] if project is not None else "",
-        disabled=True,
-    )
-    st.text_input(
-        "CLEARANCE LEVEL (auto-filled; CAT required for this project):",
-        value=str(project["Clearance Level"]) if project is not None else "",
-        disabled=True,
-    )
+        # Auto-filled from the selected project's register entry.
+        st.text_input(
+            "LOCATION OF WORK IN DETAIL (auto-filled, eg CNB, Blk 161):",
+            value=project["Location of Work"] if project is not None else "",
+            disabled=True,
+        )
+        st.text_input(
+            "OPS MANAGER ENDORSEMENT (auto-filled, Rank, Name & Appt):",
+            value=project["Ops Manager Endorsement"] if project is not None else "",
+            disabled=True,
+        )
+        st.text_input(
+            "CLEARANCE LEVEL (auto-filled; CAT required for this project):",
+            value=str(project["Clearance Level"]) if project is not None else "",
+            disabled=True,
+        )
 
     company_name = st.text_input(
         "COMPANY NAME (with ADDRESS or UEN):", value=COMPANY_NAME, key="in_company_name"
@@ -1319,34 +1540,11 @@ def main() -> None:
             key="doc_uploader",
         )
         if st.button("Read Documents with AI"):
-            if not uploaded_docs:
-                st.session_state["doc_message"] = (
-                    "info",
-                    "Upload at least one document first.",
-                )
-            else:
-                text, errors = read_uploaded_documents(uploaded_docs)
-                st.session_state["ocr_text"] = text
-                st.session_state["ocr_errors"] = errors
-                if errors:
-                    st.session_state["doc_message"] = (
-                        "error",
-                        "Could not read: " + "; ".join(errors),
-                    )
-                elif not text:
-                    st.session_state["doc_message"] = (
-                        "warning",
-                        "No readable text was found in the document(s), even "
-                        "after OCR. The file may be blank or very low quality.",
-                    )
-                else:
-                    kind, message, details = _extract_fields(text, "document(s)")
-                    st.session_state["doc_message"] = (kind, message)
-                    if details:
-                        # Re-run so the values are applied to fields that appear
-                        # above this uploader (at the top of the script).
-                        st.session_state["pending_details"] = details
-                        st.rerun()
+            handle_documents(uploaded_docs)
+        if st.button("Generate sample document (demo)"):
+            handle_documents(
+                [SampleFile(generate_sample_document(), "sample_clearance.png")]
+            )
 
         # Show what happened, right where the uploader is.
         _doc_message = st.session_state.pop("doc_message", None)
@@ -1439,7 +1637,7 @@ def main() -> None:
         ("GENDER", gender or ""),
         ("MOBILE NUMBER", mobile_number),
         ("START DATE OF EMPLOYMENT", start_date_of_employment),
-        ("PROJECT NAME", selected_project or ""),
+        ("PROJECT NAME", (temp_code if external else selected_project) or ""),
         ("PURPOSE OF CLEARANCE", purpose_of_clearance or ""),
         ("START DATE", start_date),
         ("END DATE", end_date),
@@ -1488,6 +1686,13 @@ def main() -> None:
             st.error("Please correct the format of: " + ", ".join(invalid))
         return
 
+    if project is None:
+        st.error(
+            "Please select a project (internal) or enter a valid project code "
+            "(external)."
+        )
+        return
+
     # -- Compile & present ---------------------------------------------------
     data = {
         "name": name,
@@ -1522,8 +1727,49 @@ def main() -> None:
     result = build_acres_row(data)
 
     st.subheader("ACRES Clearance Row")
-    st.caption("Review the generated row below before sending.")
-    st.dataframe(result, width="stretch")
+    if external:
+        st.caption(
+            "Project-specific fields are hidden here and attached automatically. "
+            "Review the rest before sending."
+        )
+        st.dataframe(mask_project_columns(result), width="stretch")
+    else:
+        st.caption("Review the generated row below before sending.")
+        st.dataframe(result, width="stretch")
+
+    # -- Verification (simulated SMS OTP) -----------------------------------
+    st.subheader("Verify & Send")
+    require_otp = st.checkbox(
+        "Require mobile verification before sending (simulated SMS)",
+        value=True,
+        key="require_otp",
+    )
+    if require_otp:
+        masked_mobile = mobile_number
+        if len(mobile_number) >= 6:
+            masked_mobile = mobile_number[:4] + "••" + mobile_number[-2:]
+        st.caption(
+            f"A verification code will be sent to your mobile ({masked_mobile})."
+        )
+        if st.button("Send code"):
+            code = f"{random.randint(0, 999999):06d}"
+            st.session_state["otp_code"] = code
+            st.session_state["otp_verified"] = False
+            st.info(f"Demo: SMS sent to {masked_mobile}. Your code is {code}.")
+        entered_code = st.text_input(
+            "Enter verification code:", key="otp_entered"
+        ).strip()
+        if st.button("Verify code"):
+            if (
+                st.session_state.get("otp_code")
+                and entered_code == st.session_state["otp_code"]
+            ):
+                st.session_state["otp_verified"] = True
+                st.success("Mobile verified.")
+            else:
+                st.session_state["otp_verified"] = False
+                st.error("Incorrect code. Please try again.")
+    otp_ok = (not require_otp) or bool(st.session_state.get("otp_verified"))
 
     # -- Final step: route for clearance ------------------------------------
     st.subheader("Final Step — Route for Clearance")
@@ -1532,84 +1778,126 @@ def main() -> None:
         "removing the middleman between you and them."
     )
 
-    # Pre-fill the recipient from the project executive; refresh if the project
-    # changes so the default follows the project's department.
-    if project is not None and (
-        st.session_state.get("_recipient_for_project") != project["Project Name"]
-    ):
-        st.session_state["in_recipient_email"] = PROJECT_EXECUTIVE_EMAIL
-        st.session_state["_recipient_for_project"] = project["Project Name"]
-
-    recipient_email = st.text_input(
-        "Send to (email):",
-        key="in_recipient_email",
-        placeholder=PROJECT_EXECUTIVE_EMAIL,
-        help=(
-            "Pre-filled with the project executive. Change it if your project "
-            "requires sending to someone else first."
-        ),
-    ).strip()
-
-    st.text_input(
-        "PROJECT EXECUTIVE (auto-filled):",
-        value=project.get("Project Executive", "") if project is not None else "",
-        disabled=True,
-    )
-    st.text_input(
-        "DEPARTMENT (auto-filled):",
-        value=project.get("Department", "") if project is not None else "",
-        disabled=True,
-    )
-    st.caption(
-        "Note: some projects require the details to be sent to other people "
-        "(e.g. your Ops Manager) before the project executive. If so, enter "
-        "their email above instead."
-    )
-
-    if st.button("Package & Send for Clearance", type="primary"):
-        if not recipient_email or "@" not in recipient_email:
-            st.error("Please enter a valid recipient email before sending.")
-        else:
+    if external:
+        # External parties never see the real recipient/executive/department.
+        if st.button(
+            "Package & Send for Clearance", type="primary", disabled=not otp_ok
+        ):
             filename = f"{safe_filename(name)}_ACRES_ready.csv"
             out_path = Path(__file__).with_name(filename)
             result.to_csv(out_path, index=False)
-            body = build_email_body(result, project)
-            link = mailto_link(
-                recipient_email, f"ACRES Clearance Request — {name}", body
-            )
             st.markdown(
-                f'<div class="acres-success">Packaged and routed to '
-                f"<strong>{recipient_email}</strong>. Saved locally as "
-                f"<strong>{filename}</strong>.</div>",
+                '<div class="acres-success">Submitted. Your request has been '
+                "forwarded to the project executive with the correct project "
+                "details attached.</div>",
                 unsafe_allow_html=True,
             )
-            st.markdown(f"[Open this request in your email client]({link})")
-            with st.expander("Preview the packaged details", expanded=False):
-                st.text(body)
+        if not otp_ok:
+            st.caption("Verify your mobile above to enable sending.")
+        st.caption(
+            "Project details and the recipient are kept confidential and added "
+            "automatically before the request reaches the project executive."
+        )
+    else:
+        # Pre-fill the recipient from the project executive; refresh if the
+        # project changes so the default follows the project's department.
+        if project is not None and (
+            st.session_state.get("_recipient_for_project") != project["Project Name"]
+        ):
+            st.session_state["in_recipient_email"] = PROJECT_EXECUTIVE_EMAIL
+            st.session_state["_recipient_for_project"] = project["Project Name"]
+
+        recipient_email = st.text_input(
+            "Send to (email):",
+            key="in_recipient_email",
+            placeholder=PROJECT_EXECUTIVE_EMAIL,
+            help=(
+                "Pre-filled with the project executive. Change it if your project "
+                "requires sending to someone else first."
+            ),
+        ).strip()
+
+        st.text_input(
+            "PROJECT EXECUTIVE (auto-filled):",
+            value=project.get("Project Executive", "") if project is not None else "",
+            disabled=True,
+        )
+        st.text_input(
+            "DEPARTMENT (auto-filled):",
+            value=project.get("Department", "") if project is not None else "",
+            disabled=True,
+        )
+        st.caption(
+            "Note: some projects require the details to be sent to other people "
+            "(e.g. your Ops Manager) before the project executive. If so, enter "
+            "their email above instead."
+        )
+
+        if st.button(
+            "Package & Send for Clearance", type="primary", disabled=not otp_ok
+        ):
+            if not recipient_email or "@" not in recipient_email:
+                st.error("Please enter a valid recipient email before sending.")
+            else:
+                filename = f"{safe_filename(name)}_ACRES_ready.csv"
+                out_path = Path(__file__).with_name(filename)
+                result.to_csv(out_path, index=False)
+                body = build_email_body(result, project)
+                link = mailto_link(
+                    recipient_email, f"ACRES Clearance Request — {name}", body
+                )
+                st.markdown(
+                    f'<div class="acres-success">Packaged and routed to '
+                    f"<strong>{recipient_email}</strong>. Saved locally as "
+                    f"<strong>{filename}</strong>.</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(f"[Open this request in your email client]({link})")
+                with st.expander("Preview the packaged details", expanded=False):
+                    st.text(body)
+        if not otp_ok:
+            st.caption("Verify your mobile above to enable sending.")
 
     # -- What happens next --------------------------------------------------
-    executive = project.get("Project Executive", "") if project is not None else ""
-    department = project.get("Department", "") if project is not None else ""
-    st.markdown(
-        f"""
-        <div class="acres-footer">
-            <h4>What happens next?</h4>
-            <p>Your packaged details are routed to the project executive for
-            your project's department, who submits them for clearance. This
-            removes the middleman between you and the project executive.</p>
-            <ul>
-                <li>Project executive: <strong>{executive}</strong>
-                ({PROJECT_EXECUTIVE_EMAIL})</li>
-                <li>Department: <strong>{department}</strong></li>
-            </ul>
-            <p>Some projects require sending these details to other people
-            first. If that applies, change the recipient above. We're still
-            learning each project's process, so please share any feedback.</p>
-            <p style="color:#8A94A2;font-size:0.8rem">Build {APP_VERSION}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    if external:
+        st.markdown(
+            f"""
+            <div class="acres-footer">
+                <h4>What happens next?</h4>
+                <p>Your request is forwarded to the project executive for the
+                relevant department, who submits it for clearance. Project
+                details are attached automatically and kept confidential from
+                you.</p>
+                <p>Some projects require sending these details to other people
+                first — that is handled internally. Please share any feedback.</p>
+                <p style="color:#8A94A2;font-size:0.8rem">Build {APP_VERSION}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        executive = project.get("Project Executive", "") if project is not None else ""
+        department = project.get("Department", "") if project is not None else ""
+        st.markdown(
+            f"""
+            <div class="acres-footer">
+                <h4>What happens next?</h4>
+                <p>Your packaged details are routed to the project executive for
+                your project's department, who submits them for clearance. This
+                removes the middleman between you and the project executive.</p>
+                <ul>
+                    <li>Project executive: <strong>{executive}</strong>
+                    ({PROJECT_EXECUTIVE_EMAIL})</li>
+                    <li>Department: <strong>{department}</strong></li>
+                </ul>
+                <p>Some projects require sending these details to other people
+                first. If that applies, change the recipient above. We're still
+                learning each project's process, so please share any feedback.</p>
+                <p style="color:#8A94A2;font-size:0.8rem">Build {APP_VERSION}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 if __name__ == "__main__":
