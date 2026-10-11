@@ -1,19 +1,23 @@
-# ACRES Clearance Automated Intake — Pitch Deck
+# ACRESelerate — Pitch Deck
 
 > One-line pitch: **A self-serve portal that turns a messy clearance request
 > into a ready-to-submit ACRES row and routes it straight to the project
 > executive — no middleman.**
 
+> **Prototype notice:** this is a proof of concept. Security, data-handling and
+> compliance are deliberately not addressed at this stage; use fake data only.
+
 ---
 
 ## 1. Title
-**ACRES Clearance Automated Intake**
-Clearing the path to clearance.
+**ACRESelerate**
+Clearance, accelerated.
 - Self-serve. AI-assisted. Direct to the project executive.
-- Working prototype.
+- Working prototype — security not addressed at this stage.
 
-Speaker note: "Today, getting ACRES clearance is a manual, multi-step chase. We
-built a tool that collapses it into one self-serve flow."
+Speaker note: "Today, getting ACRES clearance is a manual, multi-step chase.
+ACRESelerate collapses it into one self-serve flow. Note: this is a prototype
+and security is not addressed yet."
 
 ---
 
@@ -127,16 +131,40 @@ hallucinations."
 
 ---
 
-## 12. Roadmap
-- Real email sending (SMTP/API) + delivery receipts.
-- Live project register integration + SSO/role-based access.
-- Audit trail & submission tracking.
-- Multiple clearance rows per applicant; category-aware routing.
-- Analytics: time-to-clearance, error rates, bottlenecks.
+## 12. Powered by ChatGPT Enterprise
+ChatGPT Enterprise (through the organisation's **OpenAI API Platform**
+organization — org/project) is used for:
+- **Document understanding** — reads the uploaded clearance document (via OCR)
+  and extracts the fields.
+- **Structured extraction** — fills the form from a pasted email or message,
+  constrained to a strict schema.
+- **Drafting** — turns short notes into a clear "Nature of Involvement"
+  sentence.
+- **Access & governance** — called through the org's API Platform account and
+  lockable to the approved provider; no training on our data.
 
 ---
 
-## 13. Risks & Mitigations
+## 13. Prototype notice
+- A proof of concept to show what is possible — not a production system.
+- Security, data-handling and compliance are deliberately **not** addressed at
+  this stage.
+- Demos use fake data only; no real clearance information should be entered.
+- Any real rollout would require security review, access control and data
+  governance first.
+
+---
+
+## 14. Roadmap
+- **Singpass login** — verify identity and auto-fill personal details instantly.
+- Real email sending (SMTP/API) + delivery receipts.
+- Live project register integration + role-based access.
+- Security, data-handling and compliance review.
+- Audit trail, submission tracking and analytics.
+
+---
+
+## 15. Risks & Mitigations
 - **Sensitive data** → local model option; no third-party calls when configured
   locally; access codes; minimal retention.
 - **Model accuracy** → schema constraints + deterministic parsing + human review.

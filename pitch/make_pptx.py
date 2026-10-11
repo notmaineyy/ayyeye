@@ -157,13 +157,16 @@ def build():
     add_left_bar(s)
     add_text(s, Inches(0.9), Inches(0.9), Inches(6), Inches(0.5),
              [("ACRES", 16, True, ORANGE, 0)])
-    add_text(s, Inches(0.9), Inches(1.9), Inches(11.5), Inches(2.2),
-             [("ACRES Clearance Automated Intake", 46, True, NAVY, 0)])
-    add_text(s, Inches(0.9), Inches(3.9), Inches(10.8), Inches(1.6),
+    add_text(s, Inches(0.9), Inches(1.8), Inches(11.5), Inches(2.2),
+             [("ACRESelerate", 54, True, NAVY, 0)])
+    add_text(s, Inches(0.9), Inches(3.5), Inches(10.8), Inches(1.6),
              [("A self-serve portal that turns a messy clearance request into a "
                "ready-to-submit ACRES row and routes it straight to the project "
                "executive — no middleman.", 20, False, INK, 0)])
-    add_pills(s, ["Self-serve", "AI-assisted", "Working prototype"], top=Inches(5.6))
+    add_pills(s, ["Self-serve", "AI-assisted", "Prototype"], top=Inches(5.1))
+    add_text(s, Inches(0.9), Inches(5.9), Inches(11.5), Inches(0.6),
+             [("Prototype only — security and data-handling are not addressed at "
+               "this stage.", 14, True, ORANGE, 0)])
     slides.append(s)
 
     # 2. Problem
@@ -309,27 +312,51 @@ def build():
     add_kicker(s, "Safe to demo, ready for enterprise")
     add_title(s, "No real data, no lock-in")
     add_cards(s, [
-        ("Fake demo data", "A one-click sample document (Republic of Pineapple) — demos never touch real data.", ORANGE),
+        ("Fake demo person", "One click fills a fake person (Pineapple Pete) into the AI assistant — no real data.", ORANGE),
         ("Enterprise AI", "Ready for the OpenAI API Platform; lock the app to one approved provider.", NAVY),
         ("Mobile verification", "A verification code confirms the submission (simulated for now).", TEAL),
         ("Privacy first", "Can run fully local; project details stay confidential from external parties.", TEAL),
     ])
     slides.append(s)
 
-    # 13. Roadmap
+    # 13. Powered by ChatGPT Enterprise
+    s = prs.slides.add_slide(blank); add_left_bar(s)
+    add_kicker(s, "Powered by ChatGPT Enterprise")
+    add_title(s, "How ChatGPT Enterprise is used")
+    add_cards(s, [
+        ("Document understanding", "Reads the uploaded clearance document (via OCR) and extracts the fields.", NAVY),
+        ("Structured extraction", "Fills the form from a pasted email or message, constrained to a strict schema.", NAVY),
+        ("Drafting", "Turns short notes into a clear 'Nature of Involvement' sentence.", TEAL),
+        ("Access & governance", "Called through the org's OpenAI API Platform (org/project), locked to the approved provider. No training on our data.", ORANGE),
+    ])
+    slides.append(s)
+
+    # 14. Prototype notice
+    s = prs.slides.add_slide(blank); add_left_bar(s)
+    add_kicker(s, "Important")
+    add_title(s, "This is a prototype")
+    add_bullets(s, [
+        "A proof of concept to show what is possible — not a production system.",
+        "Security, data-handling and compliance are deliberately NOT addressed at this stage.",
+        "Demos use fake data only; no real clearance information should be entered.",
+        "Any real rollout would require security review, access control and data governance first.",
+    ], size=18)
+    slides.append(s)
+
+    # 15. Roadmap
     s = prs.slides.add_slide(blank); add_left_bar(s)
     add_kicker(s, "Roadmap")
     add_title(s, "From prototype to production")
     add_bullets(s, [
+        "Singpass login — verify identity and auto-fill personal details instantly.",
         "Real email sending (SMTP/API) with delivery receipts.",
-        "Live project-register integration and SSO / role-based access.",
-        "Audit trail and submission tracking.",
-        "Multiple clearance rows per applicant; category-aware routing.",
-        "Analytics: time-to-clearance, error rates, bottlenecks.",
-    ])
+        "Live project-register integration and role-based access.",
+        "Security, data-handling and compliance review.",
+        "Audit trail, submission tracking and analytics.",
+    ], size=17)
     slides.append(s)
 
-    # 13. Risks
+    # 16. Risks
     s = prs.slides.add_slide(blank); add_left_bar(s)
     add_kicker(s, "Risks & mitigations")
     add_title(s, "Handled deliberately")
@@ -359,8 +386,9 @@ def build():
         add_footer(s, n, total)
 
     notes = [
-        "Today, getting ACRES clearance is a manual, multi-step chase. We built "
-        "a tool that collapses it into one self-serve flow.",
+        "Today, getting ACRES clearance is a manual, multi-step chase. "
+        "ACRESelerate collapses it into one self-serve flow. Note: this is a "
+        "prototype and security is not addressed yet.",
         "Every hop and every typo adds days. Applicants decode categories and "
         "MSD numbers by hand, then chase project details.",
         "The real cost is time: waiting, rework loops, and risk from scattered "
@@ -382,9 +410,15 @@ def build():
         "Applicants, executives, ops managers and admin teams all benefit.",
         "Faster, more accurate, less admin, safer and scalable across projects.",
         "This is a working prototype, tested on real scanned clearance documents.",
-        "Demos use obviously fake data, the AI is ready for the enterprise "
-        "provider, and a mobile code confirms the submission.",
-        "Next: real email sending, live register + SSO, audit trail and analytics.",
+        "Demos use a fake person, the AI is ready for the enterprise provider, "
+        "and a mobile code confirms the submission.",
+        "ChatGPT Enterprise (via the org's OpenAI API Platform) does the document "
+        "understanding, structured field extraction and drafting — locked to the "
+        "approved provider, with no training on our data.",
+        "To be explicit: this is a prototype. Security, data handling and "
+        "compliance are not addressed yet, and only fake data should be used.",
+        "Next: Singpass login to verify identity and auto-fill personal details, "
+        "then email sending, register integration and a security review.",
         "Sensitive data and model accuracy are handled with local AI and "
         "deterministic parsing.",
         "The ask: pilot with one project team and measure the before/after.",

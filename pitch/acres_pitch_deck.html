@@ -100,16 +100,18 @@
 
 <section class="slide active">
   <div class="brandbar"><span class="dot"></span><span class="brandname">ACRES</span></div>
-  <div class="kicker">Clearance, cleared</div>
-  <h1>ACRES Clearance<br>Automated Intake</h1>
+  <div class="kicker">Clearance, accelerated</div>
+  <h1>ACRESelerate</h1>
   <p class="sub">A self-serve portal that turns a messy clearance request into a
   ready-to-submit ACRES row and routes it straight to the project executive —
   <strong>no middleman</strong>.</p>
   <div class="pills">
     <span class="pill">Self-serve</span>
     <span class="pill">AI-assisted</span>
-    <span class="pill">Working prototype</span>
+    <span class="pill">Prototype</span>
   </div>
+  <p style="color:#F26522;font-weight:700;margin-top:1.2rem">Prototype only —
+  security and data-handling are not addressed at this stage.</p>
 </section>
 
 <section class="slide">
@@ -266,14 +268,40 @@
 </section>
 
 <section class="slide">
+  <div class="kicker">Powered by ChatGPT Enterprise</div>
+  <h2>How ChatGPT Enterprise is used</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>Document understanding</h3><p>Reads the uploaded clearance document (via OCR) and extracts the fields.</p></div>
+      <div class="card"><h3>Structured extraction</h3><p>Fills the form from a pasted email or message, constrained to a strict schema.</p></div>
+    </div>
+    <div>
+      <div class="card teal"><h3>Drafting</h3><p>Turns short notes into a clear “Nature of Involvement” sentence.</p></div>
+      <div class="card orange"><h3>Access &amp; governance</h3><p>Called through the org's OpenAI API Platform (org/project), locked to the approved provider. No training on our data.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="kicker">Important</div>
+  <h2>This is a prototype</h2>
+  <ul>
+    <li>A proof of concept to show what is possible — not a production system.</li>
+    <li>Security, data-handling and compliance are deliberately <strong>not</strong> addressed at this stage.</li>
+    <li>Demos use fake data only; no real clearance information should be entered.</li>
+    <li>Any real rollout would require security review, access control and data governance first.</li>
+  </ul>
+</section>
+
+<section class="slide">
   <div class="kicker">Roadmap</div>
   <h2>From prototype to production</h2>
   <ul>
+    <li><strong>Singpass login</strong> — verify identity and auto-fill personal details instantly.</li>
     <li>Real email sending (SMTP/API) with delivery receipts.</li>
-    <li>Live project-register integration and SSO / role-based access.</li>
-    <li>Audit trail and submission tracking.</li>
-    <li>Multiple clearance rows per applicant; category-aware routing.</li>
-    <li>Analytics: time-to-clearance, error rates, bottlenecks.</li>
+    <li>Live project-register integration and role-based access.</li>
+    <li>Security, data-handling and compliance review.</li>
+    <li>Audit trail, submission tracking and analytics.</li>
   </ul>
 </section>
 

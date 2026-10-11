@@ -32,7 +32,7 @@ import pandas as pd
 import pymupdf
 import pytesseract
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -84,6 +84,27 @@ JOB_EXAMPLE = (
     "prepare test reports"
 )
 
+#: Free-text sample person used by the demo button. Obviously fake.
+SAMPLE_PERSON_TEXT = (
+    "Hi, please raise ACRES clearance for the following person.\n"
+    "Name: Pineapple Pete\n"
+    "NRIC: S0000000A\n"
+    "Nationality: Singaporean\n"
+    "Country of Birth: Singapore\n"
+    "Date of Birth: 1990-01-01\n"
+    "Religion: Pastafarian\n"
+    "Gender: Male\n"
+    "Mobile Number: 90000000\n"
+    "HP and Email: 90000000 / pineapple.pete@example.com\n"
+    "Appointment/Designation: Chief Pineapple Officer\n"
+    "Start Date of Employment: 2020-01-01\n"
+    "Clearance Category: 1A\n"
+    "MSD Ref Number: M/202500000000000\n"
+    "MSD Ref Date: 2024-06-30\n"
+    "Start Date: 2025-02-01\n"
+    "End Date: 2026-01-31"
+)
+
 #: ACRES output columns, in template order.
 ACRES_COLUMNS = [
     "NAME",
@@ -120,7 +141,7 @@ COMPANY_NAME = "DSTA (1 Depot Road S109679)"
 
 #: Build/version stamp shown in the UI (bump this on each deploy so it is easy
 #: to confirm which version is live).
-APP_VERSION = "2026-10-11.1"
+APP_VERSION = "2026-10-11.2"
 
 #: Dummy project-executive email used to pre-fill the routing field. The real
 #: recipient is derived from the project's department (see projects.csv).
@@ -282,7 +303,9 @@ def _extract_json(text: str) -> str:
     return text
 
 
-def chat(messages: list[dict], schema: dict | None = None) -> str:
+def chat(
+    messages: list[dict], schema: dict | None = None, temperature: float | None = None
+) -> str:
     """Send a chat request to the active provider and return the text reply.
 
     When ``schema`` is given, the provider is asked to return JSON matching it.
@@ -302,6 +325,8 @@ def chat(messages: list[dict], schema: dict | None = None) -> str:
             project=config.get("project"),
         )
         kwargs: dict = {"model": config["model"], "messages": messages}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         if config["provider"] == "OpenCode Go":
             # OpenCode Go requires a stable session id and a client user agent.
             kwargs["extra_headers"] = {
@@ -329,6 +354,8 @@ def chat(messages: list[dict], schema: dict | None = None) -> str:
         return response.choices[0].message.content or ""
 
     kwargs = {"model": OLLAMA_MODEL, "messages": messages}
+    if temperature is not None:
+        kwargs["options"] = {"temperature": temperature}
     if schema is not None:
         kwargs["format"] = schema
     response = ollama.chat(**kwargs)
@@ -567,6 +594,9 @@ class DocumentDetails(BaseModel):
     religion: str | None = Field(default=None, description="Religion")
     gender: str | None = Field(default=None, description="Gender")
     mobile_number: str | None = Field(default=None, description="Mobile number")
+    hp_email: str | None = Field(
+        default=None, description="Mobile number and email address (for locals)"
+    )
     appointment_designation: str | None = Field(
         default=None, description="Appointment or designation"
     )
@@ -649,62 +679,6 @@ def extract_text_from_document(uploaded_file) -> str:
         return extract_text_from_pdf(uploaded_file)
     except Exception:  # noqa: BLE001 - not a PDF, try as an image
         return extract_text_from_image(uploaded_file)
-
-
-#: Obvious fake data for safe demos — never real people or projects.
-SAMPLE_DOC_LINES = [
-    "REPUBLIC OF PINEAPPLE - CLEARANCE FORM",
-    "Full Name: Pineapple Pete",
-    "NRIC: S0000000A",
-    "Nationality: Pineapplean",
-    "Country of Birth: Republic of Pineapple",
-    "Date of Birth: 01 Jan 1990",
-    "Religion: Pastafarian",
-    "Gender: Male",
-    "Mobile Number: 90000000",
-    "Appointment/Designation: Chief Pineapple Officer",
-    "Start Date of Employment: 01 Jan 2020",
-    "Clearance Category: 1A",
-    "MSD Ref Number: M/202500000000000",
-    "MSD Ref Date: 30 June 2024",
-    "Start Date: 01 Feb 2025",
-    "End Date: 31 Jan 2026",
-]
-
-
-def _sample_font(size: int):
-    for path in (
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ):
-        try:
-            return ImageFont.truetype(path, size)
-        except Exception:  # noqa: BLE001 - fall back to the default font
-            continue
-    return ImageFont.load_default()
-
-
-def generate_sample_document() -> bytes:
-    """Render an obviously fake clearance document as PNG bytes for demos."""
-    image = Image.new("RGB", (1240, 1560), "white")
-    draw = ImageDraw.Draw(image)
-    body_font = _sample_font(30)
-    title_font = _sample_font(40)
-    y = 60
-    for index, line in enumerate(SAMPLE_DOC_LINES):
-        draw.text((60, y), line, fill="black", font=title_font if index == 0 else body_font)
-        y += 80 if index == 0 else 60
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    return buffer.getvalue()
-
-
-class SampleFile(io.BytesIO):
-    """A file-like object that mimics an uploaded file (name + read)."""
-
-    def __init__(self, data: bytes, name: str):
-        super().__init__(data)
-        self.name = name
 
 
 #: Column labels used in clearance tables/forms, matched against upper-cased text.
@@ -907,10 +881,8 @@ def _parse_msd_row(line: str) -> dict[str, str]:
 def parse_msd_from_text(text: str) -> dict[str, str]:
     """Deterministically pull MSD reference numbers and dates out of raw text.
 
-    The model is unreliable for these reference codes, so they are parsed
-    directly. Supports a clearance table (Clearance Category | MSD Ref Number |
-    MSD Reference Date | Start Date | End Date), labelled lines
-    (``Label: value`` or value on the following line), and OCR-collapsed rows.
+    Supports a clearance table (Clearance Category | MSD Ref Number |
+    MSD Ref Date | Start Date | End Date), labelled lines and OCR-collapsed rows.
     """
     original = [line.rstrip() for line in text.splitlines()]
     segmented = _segment_labels(text)
@@ -923,45 +895,127 @@ def parse_msd_from_text(text: str) -> dict[str, str]:
     return result
 
 
+#: Fields that hold dates (normalised when parsed from labelled lines).
+_LABELLED_DATE_KEYS = {
+    "date_of_birth",
+    "start_date_of_employment",
+    "msd_ref_date",
+    "clearance_start_date",
+    "clearance_end_date",
+}
+
+
+def _map_person_label(label: str) -> str | None:
+    """Map a free-text field label onto a DocumentDetails key."""
+    text = label.lower().strip().strip("*#- ").strip()
+    if "project" in text and "name" in text:
+        return None
+    if "msd" in text and "date" in text:
+        return "msd_ref_date"
+    if "msd" in text:
+        return "msd_ref_number"
+    if "clearance category" in text or text == "category":
+        return "clearance_category"
+    if "country of birth" in text:
+        return "country_of_birth"
+    if "date of birth" in text or text == "dob":
+        return "date_of_birth"
+    if "employment" in text:
+        return "start_date_of_employment"
+    if "nationality" in text:
+        return "nationality"
+    if "religion" in text:
+        return "religion"
+    if "gender" in text or text == "sex":
+        return "gender"
+    if "appointment" in text or "designation" in text:
+        return "appointment_designation"
+    if "hp and email" in text or "email" in text:
+        return "hp_email"
+    if "mobile" in text:
+        return "mobile_number"
+    if "nric" in text or text == "fin":
+        return "nric"
+    if "name" in text:
+        return "name"
+    if "start date" in text:
+        return "clearance_start_date"
+    if "end date" in text:
+        return "clearance_end_date"
+    return None
+
+
+def parse_labelled_fields(text: str) -> dict[str, str]:
+    """Deterministically read ``Label: value`` lines into form fields.
+
+    Reliable for labelled input (emails, templates) so the model only has to
+    handle genuinely free-form text.
+    """
+    result: dict[str, str] = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip().lstrip("-•*# ").strip()
+        if not line or ":" not in line:
+            continue
+        label, value = line.split(":", 1)
+        key = _map_person_label(label)
+        if not key:
+            continue
+        value = value.strip().strip(",;").strip()
+        if not value:
+            continue
+        if key in _LABELLED_DATE_KEYS:
+            value = normalize_date(value) or value
+        result.setdefault(key, value)
+    return result
+
+
 def extract_document_details(text: str) -> dict[str, str]:
     """Read structured clearance details out of document text using the model.
-
     The document text (from a PDF or email) is sent to the local model, which
     is constrained to the ``DocumentDetails`` schema. Empty values are dropped.
     MSD reference numbers/dates are additionally parsed deterministically and
     fill any gaps the model leaves.
     """
     result: dict[str, str] = {}
-    for _ in range(2):  # retry once if the model returns nothing useful
-        content = chat(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You extract personnel and clearance details from the "
-                        "provided document text for an ACRES security clearance "
-                        "form. Return only the fields defined by the schema, and "
-                        "use null for anything not present. Convert all dates to "
-                        "YYYY-MM-DD format."
-                    ),
-                },
-                {"role": "user", "content": text},
-            ],
-            schema=DocumentDetails.model_json_schema(),
-        )
-        parsed = DocumentDetails.model_validate_json(_extract_json(content))
-        result = {}
+    expected_fields = len(DocumentDetails.model_fields)
+    # The small local model is inconsistent and deterministic within a run, so
+    # vary the temperature across passes and merge results — a field missed in
+    # one pass is often caught in another.
+    for temperature in (0.0, 0.7, 1.0):
+        try:
+            content = chat(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You extract personnel and clearance details from the "
+                            "provided text for an ACRES security clearance form. "
+                            "Populate every field that is present, using null only "
+                            "when a field is genuinely absent. Convert all dates to "
+                            "YYYY-MM-DD format."
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ],
+                schema=DocumentDetails.model_json_schema(),
+                temperature=temperature,
+            )
+            parsed = DocumentDetails.model_validate_json(_extract_json(content))
+        except Exception:  # noqa: BLE001 - skip a bad pass and try again
+            continue
         for key, value in parsed.model_dump().items():
             cleaned = value.strip() if isinstance(value, str) else ""
             if key.endswith("date") or key == "date_of_birth":
                 cleaned = normalize_date(cleaned)
             if cleaned:
-                result[key] = cleaned
-        if result:
+                result.setdefault(key, cleaned)
+        if len(result) >= expected_fields - 2:
             break
 
-    # MSD reference numbers/dates are parsed directly and take precedence,
-    # since the model is unreliable for these codes.
+    # Fill any gaps the model missed using the deterministic labelled parser,
+    # then let the deterministic MSD parser take precedence for reference codes.
+    for key, value in parse_labelled_fields(text).items():
+        result.setdefault(key, value)
     result.update(parse_msd_from_text(text))
     return result
 
@@ -1127,6 +1181,7 @@ def apply_document_details(details: dict[str, str]) -> None:
         "religion": "in_religion",
         "gender": "in_gender",
         "mobile_number": "in_mobile",
+        "hp_email": "in_hp_email",
         "appointment_designation": "in_company_appt",
         "start_date_of_employment": "in_start_employment",
         "clearance_category": "in_clearance_category",
@@ -1185,6 +1240,15 @@ def on_ai_autofill() -> None:
     st.session_state["ai_message"] = (kind, message)
 
 
+def on_generate_sample_person() -> None:
+    """Callback: put a fake sample person into the AI text box.
+
+    Runs before the widget is created, so assigning the key is allowed; the
+    box updates on the next rerun. The user then selects "Auto-fill form with AI".
+    """
+    st.session_state["ai_text"] = SAMPLE_PERSON_TEXT
+
+
 def read_uploaded_documents(uploaded) -> tuple[str, list[str]]:
     """Return (text, errors) for a list of uploaded PDF/image documents."""
     text_parts: list[str] = []
@@ -1197,10 +1261,21 @@ def read_uploaded_documents(uploaded) -> tuple[str, list[str]]:
     return "\n".join(text_parts).strip(), errors
 
 
-def handle_documents(uploaded) -> None:
+#: Document fields that the MSD clearance document is allowed to fill.
+MSD_ONLY_KEYS = {
+    "clearance_category",
+    "msd_ref_number",
+    "msd_ref_date",
+    "clearance_start_date",
+    "clearance_end_date",
+}
+
+
+def handle_documents(uploaded, mode: str = "full") -> None:
     """Read documents, extract details, and stash them for the next run.
 
-    Shared by the upload and "generate sample document" buttons.
+    ``mode="msd"`` keeps only the MSD/clearance fields (used by the MSD
+    document upload); ``mode="full"`` applies everything.
     """
     if not uploaded:
         st.session_state["doc_message"] = (
@@ -1225,6 +1300,8 @@ def handle_documents(uploaded) -> None:
         )
         return
     kind, message, details = _extract_fields(text, "document(s)")
+    if mode == "msd" and details:
+        details = {k: v for k, v in details.items() if k in MSD_ONLY_KEYS}
     st.session_state["doc_message"] = (kind, message)
     if details:
         # Re-run so the values are applied to fields that appear above this
@@ -1271,15 +1348,16 @@ def render_instructions() -> None:
                 (e.g. 1990-05-12) and NRIC/FIN like <strong>S1234567A</strong>.</li>
                 <li>Fastest way: paste your details into the
                 <strong>AI Intake Assistant</strong> and select
-                <strong>Auto-fill form with AI</strong>.</li>
-                <li>You can also attach a PDF/image clearance document near the
-                MSD section and select <strong>Read Documents with AI</strong>.</li>
+                <strong>Auto-fill form with AI</strong>. To see it in action,
+                select <strong>Generate sample person (demo)</strong> first.</li>
+                <li>Upload your MSD clearance document (image/PDF) near the
+                clearance fields and select <strong>Read MSD document</strong> —
+                it fills only the MSD details.</li>
                 <li>Select a project; the location, end date, ops manager and
                 clearance level are filled in automatically.</li>
                 <li>Describe your work briefly; the AI expands it into a full
                 sentence you can edit.</li>
-                <li>Review everything, then select
-                <strong>Submit to Security</strong>.</li>
+                <li>Review everything, then package and send for clearance.</li>
             </ul>
         </div>
         """,
@@ -1353,12 +1431,19 @@ def main() -> None:
             "31 Jan 2026."
         ),
     )
-    st.button(
-        "Auto-fill form with AI",
-        type="primary",
-        on_click=on_ai_autofill,
+    demo_col, fill_col = st.columns(2)
+    with demo_col:
+        st.button(
+            "Generate sample person (demo)",
+            on_click=on_generate_sample_person,
+            help="Fills the box above with a fake person (Pineapple Pete).",
+        )
+    with fill_col:
+        st.button("Auto-fill form with AI", type="primary", on_click=on_ai_autofill)
+    st.caption(
+        "Demo uses a fake person (Pineapple Pete) — no real data. Then select "
+        f"Auto-fill. Model provider: {active_provider()}"
     )
-    st.caption(f"Model provider: {active_provider()}")
     _ai_message = st.session_state.pop("ai_message", None)
     if _ai_message:
         _kind, _text = _ai_message
@@ -1528,23 +1613,21 @@ def main() -> None:
     ).strip()
 
     # -- Attach clearance documents (just above the MSD inputs) -------------
-    with st.expander("Attach MSD / clearance document (PDF or image)", expanded=True):
+    with st.expander("Upload MSD clearance document (image/PDF)", expanded=True):
         st.caption(
-            "Upload the clearance document (PDF or image). The AI reads it and "
-            "fills the MSD details and other fields above and below."
+            "Upload the MSD clearance document (image or PDF). The AI reads it "
+            "and fills only the MSD details below — clearance category, MSD ref "
+            "number/date and start/end dates. It does not touch your personal "
+            "details."
         )
         uploaded_docs = st.file_uploader(
-            "Upload PDF or image document(s)",
+            "Upload MSD document (image/PDF)",
             type=["pdf", "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp"],
             accept_multiple_files=True,
             key="doc_uploader",
         )
-        if st.button("Read Documents with AI"):
-            handle_documents(uploaded_docs)
-        if st.button("Generate sample document (demo)"):
-            handle_documents(
-                [SampleFile(generate_sample_document(), "sample_clearance.png")]
-            )
+        if st.button("Read MSD document"):
+            handle_documents(uploaded_docs, mode="msd")
 
         # Show what happened, right where the uploader is.
         _doc_message = st.session_state.pop("doc_message", None)
@@ -1559,7 +1642,7 @@ def main() -> None:
 
         _ocr_text = st.session_state.get("ocr_text")
         if _ocr_text is not None:
-            with st.expander("What the AI read (raw OCR text)", expanded=True):
+            with st.expander("What the AI read (raw OCR text)", expanded=False):
                 if _ocr_text:
                     st.code(_ocr_text, language="text")
                 else:

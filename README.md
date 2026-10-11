@@ -35,14 +35,16 @@ A pitch deck explaining the idea and product is in `pitch/`:
   (e.g. `ALPHA-7X3K`); the real project details are attached automatically and
   stay hidden from them.
 - **Simulated SMS OTP** verification before sending (demo; no real SMS sent).
-- **Fake demo data**: a "Generate sample document" button plus committed sample
-  files in `samples/` (Republic of Pineapple) for safe testing.
+- **Demo**: a "Generate sample person (demo)" button drops a fake person into the
+  AI Intake Assistant, which then fills the whole form in one click.
 
-## Fake demo data
+## Demo
 
-- In the app: **Generate sample document (demo)** in the document-import panel.
-- Committed files: `samples/fake_clearance.png` / `.pdf` (obviously fake).
-- Regenerate with `.venv/bin/python make_samples.py`.
+- In the app: **Generate sample person (demo)** (in the AI Intake Assistant) →
+  then **Auto-fill form with AI**. Uses a fake person (Pineapple Pete) — no real
+  data.
+- The MSD document upload fills **only** MSD fields (clearance category, MSD ref
+  number/date, start/end dates).
 
 ## Prerequisites
 
