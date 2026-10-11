@@ -120,7 +120,7 @@ COMPANY_NAME = "DSTA (1 Depot Road S109679)"
 
 #: Build/version stamp shown in the UI (bump this on each deploy so it is easy
 #: to confirm which version is live).
-APP_VERSION = "2026-10-06.4"
+APP_VERSION = "2026-10-11.1"
 
 #: Dummy project-executive email used to pre-fill the routing field. The real
 #: recipient is derived from the project's department (see projects.csv).
