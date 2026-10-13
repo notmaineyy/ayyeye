@@ -83,15 +83,15 @@ Then open http://localhost:8501.
 
    # …or Gemini (free key: https://aistudio.google.com/apikey)
    # GEMINI_API_KEY = "your-gemini-key"
+   # GEMINI_MODEL = "gemini-2.0-flash"
 
-   # …or OpenAI API Platform / "ChatGPT Enterprise" (PLACEHOLDER, inactive)
+   # …or any OpenAI-compatible provider (OpenAI / Groq / OpenRouter)
    # OPENAI_API_KEY = "sk-..."
-   # OPENAI_ORGANIZATION = "org-..."
-   # OPENAI_PROJECT = "proj_..."
+   # OPENAI_BASE_URL = "https://api.openai.com/v1"
    # OPENAI_MODEL = "gpt-4o-mini"
 
-   # Lock the app to one provider: "openai" | "gemini" | "opencode"
-   # FORCE_PROVIDER = "openai"
+   # Lock the app to one provider: "opencode" | "gemini" | "openai"
+   # FORCE_PROVIDER = "opencode"
 
    ACRES_ACCESS_CODE = "choose-a-code"
    ```
@@ -99,10 +99,10 @@ Then open http://localhost:8501.
 5. Deploy. `packages.txt` installs Tesseract (OCR) automatically; the app uses
    the configured cloud model, otherwise local Ollama.
 
-> Enterprise access is via the OpenAI **API Platform** organization, which is
-> separate from a ChatGPT Enterprise workspace. The enterprise keys are
-> placeholders and inactive until filled in.
-> Provider precedence: OpenCode Go → Gemini → OpenAI → local Ollama.
+> AI tools: **OpenCode Go** (default, `deepseek-v4-flash`), **Google Gemini**
+> (`gemini-2.0-flash`) or **local Ollama** (`llama3.1`) for the LLM, plus
+> **Tesseract** OCR for scanned documents. Provider precedence: OpenCode Go →
+> Gemini → OpenAI-compatible → local Ollama.
 > On the cloud there is no Ollama, so a key is required for the AI features.
 > Clearance data sent to that provider leaves your machine — only use dummy
 > data while testing.

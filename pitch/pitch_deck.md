@@ -131,17 +131,22 @@ hallucinations."
 
 ---
 
-## 12. Powered by ChatGPT Enterprise
-ChatGPT Enterprise (through the organisation's **OpenAI API Platform**
-organization — org/project) is used for:
-- **Document understanding** — reads the uploaded clearance document (via OCR)
-  and extracts the fields.
-- **Structured extraction** — fills the form from a pasted email or message,
-  constrained to a strict schema.
-- **Drafting** — turns short notes into a clear "Nature of Involvement"
-  sentence.
-- **Access & governance** — called through the org's API Platform account and
-  lockable to the approved provider; no training on our data.
+## 12. AI tools used
+The AI runs on one provider, chosen automatically:
+- **OpenCode Go** — OpenAI-compatible API (`https://opencode.ai/zen/go/v1`),
+  default model `deepseek-v4-flash`. Used when `OPENCODE_API_KEY` is set.
+- **Google Gemini** — free tier, `gemini-2.0-flash`.
+- **Local Ollama** — `llama3.1`, fully offline, when no cloud key is set.
+- Precedence: OpenCode Go → Gemini → OpenAI-compatible → Ollama.
+
+Also used:
+- **OCR — Tesseract** (with PyMuPDF) to read scanned PDFs and images.
+- **Deterministic parsing** (not AI) for MSD reference numbers, clearance
+  categories and dates.
+
+How the LLM is used: document understanding, structured field extraction from a
+pasted email/message (strict schema), and drafting the "Nature of Involvement"
+sentence.
 
 ---
 

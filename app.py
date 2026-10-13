@@ -159,9 +159,9 @@ PROJECT_EXECUTIVE_EMAIL = "abc@dsta.gov.sg"
 #   * OpenAI-compatible    - OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 #                            (also works for Groq / OpenRouter / Together)
 #
-# Enterprise (OpenAI API Platform / "ChatGPT Enterprise") is supported but
-# INACTIVE until its key is provided. Set OPENAI_API_KEY (+ OPENAI_ORGANIZATION,
-# OPENAI_PROJECT) and optionally FORCE_PROVIDER="openai" to lock the app to it.
+# Any OpenAI-compatible provider (including an org's OpenAI API Platform
+# account) works by setting OPENAI_API_KEY (+ OPENAI_ORGANIZATION, OPENAI_PROJECT)
+# and optionally FORCE_PROVIDER="openai" to lock the app to it.
 # ---------------------------------------------------------------------------
 
 OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
@@ -182,7 +182,7 @@ def get_secret(name: str) -> str:
 
 
 def openai_model_config() -> dict | None:
-    """Return the OpenAI (enterprise API Platform) config, if a key is set."""
+    """Return the OpenAI-compatible provider config, if a key is set."""
     api_key = get_secret("OPENAI_API_KEY").strip()
     if not api_key:
         return None
@@ -199,7 +199,7 @@ def openai_model_config() -> dict | None:
 def cloud_model_config() -> dict | None:
     """Return cloud model settings when an API key is configured.
 
-    OpenCode Go takes precedence, then Gemini, then OpenAI (enterprise). A
+    OpenCode Go takes precedence, then Gemini, then OpenAI-compatible. A
     ``FORCE_PROVIDER`` secret can lock the app to a single provider.
     """
     forced = get_secret("FORCE_PROVIDER").strip().lower()

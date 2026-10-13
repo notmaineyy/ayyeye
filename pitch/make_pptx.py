@@ -307,27 +307,27 @@ def build():
     ], size=17)
     slides.append(s)
 
-    # 12. Safe demos & enterprise-ready
+    # 12. Safe demos
     s = prs.slides.add_slide(blank); add_left_bar(s)
-    add_kicker(s, "Safe to demo, ready for enterprise")
-    add_title(s, "No real data, no lock-in")
+    add_kicker(s, "Safe to demo")
+    add_title(s, "No real data")
     add_cards(s, [
         ("Fake demo person", "One click fills a fake person (Pineapple Pete) into the AI assistant — no real data.", ORANGE),
-        ("Enterprise AI", "Ready for the OpenAI API Platform; lock the app to one approved provider.", NAVY),
+        ("Flexible AI", "Works with OpenCode Go, Google Gemini, or fully local Ollama.", NAVY),
         ("Mobile verification", "A verification code confirms the submission (simulated for now).", TEAL),
         ("Privacy first", "Can run fully local; project details stay confidential from external parties.", TEAL),
     ])
     slides.append(s)
 
-    # 13. Powered by ChatGPT Enterprise
+    # 13. AI tools used
     s = prs.slides.add_slide(blank); add_left_bar(s)
-    add_kicker(s, "Powered by ChatGPT Enterprise")
-    add_title(s, "How ChatGPT Enterprise is used")
+    add_kicker(s, "AI tools used")
+    add_title(s, "The AI stack")
     add_cards(s, [
-        ("Document understanding", "Reads the uploaded clearance document (via OCR) and extracts the fields.", NAVY),
-        ("Structured extraction", "Fills the form from a pasted email or message, constrained to a strict schema.", NAVY),
-        ("Drafting", "Turns short notes into a clear 'Nature of Involvement' sentence.", TEAL),
-        ("Access & governance", "Called through the org's OpenAI API Platform (org/project), locked to the approved provider. No training on our data.", ORANGE),
+        ("LLM — OpenCode Go", "OpenAI-compatible API (default model deepseek-v4-flash) for understanding and drafting.", NAVY),
+        ("LLM — Google Gemini", "Free-tier model (gemini-2.0-flash) as an alternative provider.", NAVY),
+        ("LLM — local Ollama", "Runs fully offline with llama3.1 when no cloud key is set.", TEAL),
+        ("OCR — Tesseract", "Reads scanned PDFs and images (via PyMuPDF + pytesseract).", ORANGE),
     ])
     slides.append(s)
 
@@ -410,11 +410,9 @@ def build():
         "Applicants, executives, ops managers and admin teams all benefit.",
         "Faster, more accurate, less admin, safer and scalable across projects.",
         "This is a working prototype, tested on real scanned clearance documents.",
-        "Demos use a fake person, the AI is ready for the enterprise provider, "
-        "and a mobile code confirms the submission.",
-        "ChatGPT Enterprise (via the org's OpenAI API Platform) does the document "
-        "understanding, structured field extraction and drafting — locked to the "
-        "approved provider, with no training on our data.",
+        "Demos use a fake person, and a mobile code confirms the submission.",
+        "The AI runs on OpenCode Go (default), Google Gemini, or fully local "
+        "Ollama, with Tesseract OCR for scanned documents.",
         "To be explicit: this is a prototype. Security, data handling and "
         "compliance are not addressed yet, and only fake data should be used.",
         "Next: Singpass login to verify identity and auto-fill personal details, "

@@ -268,16 +268,16 @@
 </section>
 
 <section class="slide">
-  <div class="kicker">Powered by ChatGPT Enterprise</div>
-  <h2>How ChatGPT Enterprise is used</h2>
+  <div class="kicker">AI tools used</div>
+  <h2>The AI stack</h2>
   <div class="cols">
     <div>
-      <div class="card"><h3>Document understanding</h3><p>Reads the uploaded clearance document (via OCR) and extracts the fields.</p></div>
-      <div class="card"><h3>Structured extraction</h3><p>Fills the form from a pasted email or message, constrained to a strict schema.</p></div>
+      <div class="card"><h3>LLM — OpenCode Go</h3><p>OpenAI-compatible API (default model deepseek-v4-flash) for understanding and drafting.</p></div>
+      <div class="card"><h3>LLM — Google Gemini</h3><p>Free-tier model (gemini-2.0-flash) as an alternative provider.</p></div>
     </div>
     <div>
-      <div class="card teal"><h3>Drafting</h3><p>Turns short notes into a clear “Nature of Involvement” sentence.</p></div>
-      <div class="card orange"><h3>Access &amp; governance</h3><p>Called through the org's OpenAI API Platform (org/project), locked to the approved provider. No training on our data.</p></div>
+      <div class="card teal"><h3>LLM — local Ollama</h3><p>Runs fully offline with llama3.1 when no cloud key is set.</p></div>
+      <div class="card orange"><h3>OCR — Tesseract</h3><p>Reads scanned PDFs and images (via PyMuPDF + pytesseract).</p></div>
     </div>
   </div>
 </section>
